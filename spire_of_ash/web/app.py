@@ -16,12 +16,18 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from ..engine import records
 from ..engine.errors import InvalidAction
-from .dto import CLASS_ROSTER, view
+from .dto import CLASS_ROSTER, piles_view, view
 from .launcher import open_browser, quiet_terminal
 from .sessions import COOKIE, SessionStore
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-UI_FILE = os.path.join(HERE, "static", "index.html")
+STATIC_DIR = os.path.join(HERE, "static")
+UI_FILE = os.path.join(STATIC_DIR, "index.html")
+CONTENT_TYPES = {".html": "text/html; charset=utf-8",
+                 ".css": "text/css; charset=utf-8",
+                 ".js": "text/javascript; charset=utf-8",
+                 ".svg": "image/svg+xml",
+                 ".woff2": "font/woff2"}
 MAX_BODY = 64 * 1024          # actions are tiny; refuse anything remotely large
 DEFAULT_PORT = 8765
 
@@ -121,6 +127,8 @@ class Handler(BaseHTTPRequestHandler):
     def _dispatch(self, routes):
         path = self.path.split("?")[0].rstrip("/") or "/"
         handler = routes.get(path)
+        if handler is None and routes is GET_ROUTES and path.startswith("/static/"):
+            handler = _static_handler(path)
         if handler is None:
             self._error(404, f"No route for {path}.")
             return
@@ -139,22 +147,38 @@ class Handler(BaseHTTPRequestHandler):
 
 
 # ── handlers ──
-def serve_ui(h):
+def _serve_file(h, path, ctype):
     try:
-        with open(UI_FILE, "rb") as f:
+        with open(path, "rb") as f:
             body = f.read()
     except OSError:
-        log.error("UI file missing: %s", UI_FILE)
-        h._error(500, "The interface file is missing on the server.")
+        log.error("static file missing: %s", path)
+        h._error(500, "A file this page needs is missing on the server.")
         return
     etag = '"%s"' % hashlib.sha256(body).hexdigest()[:32]
     if h.headers.get("If-None-Match") == etag:
         h.send_response(304)
         h.send_header("ETag", etag)
+        h.send_header("Content-Length", "0")
         h.end_headers()
         return
-    h._send(200, body, "text/html; charset=utf-8",
-            (("ETag", etag), ("Cache-Control", "no-cache")))
+    h._send(200, body, ctype, (("ETag", etag), ("Cache-Control", "no-cache")))
+
+
+def serve_ui(h):
+    _serve_file(h, UI_FILE, CONTENT_TYPES[".html"])
+
+
+def _static_handler(path):
+    """Resolve /static/<name>, refusing anything that escapes the directory."""
+    name = path[len("/static/"):]
+    target = os.path.normpath(os.path.join(STATIC_DIR, name))
+    if os.path.commonpath([target, STATIC_DIR]) != STATIC_DIR:
+        return None
+    if not os.path.isfile(target):
+        return None
+    ctype = CONTENT_TYPES.get(os.path.splitext(target)[1], "application/octet-stream")
+    return lambda h: _serve_file(h, target, ctype)
 
 
 def get_state(h):
@@ -169,6 +193,13 @@ def get_records(h):
 
 def get_classes(h):
     h._json(CLASS_ROSTER)
+
+
+def get_piles(h):
+    """Draw/discard/exhaust contents, only when the player asks to see them."""
+    session, cookie = h._session()
+    with session.lock:
+        h._json(piles_view(session.run), extra_headers=cookie)
 
 
 def post_action(h):
@@ -211,6 +242,7 @@ GET_ROUTES = {
     "/state": get_state,
     "/records": get_records,
     "/classes": get_classes,
+    "/piles": get_piles,
 }
 POST_ROUTES = {
     "/action": post_action,

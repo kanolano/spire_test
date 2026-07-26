@@ -219,6 +219,41 @@ class TestUi(WebTestCase):
         self.assertEqual(ctx.exception.code, 304)
 
 
+class TestStatic(WebTestCase):
+    def test_stylesheet_and_script_are_served(self):
+        for path, ctype in (("/static/app.css", "text/css"),
+                            ("/static/app.js", "text/javascript")):
+            status, _, headers = self.client().request(path)
+            self.assertEqual(status, 200, path)
+            self.assertIn(ctype, headers.get("Content-Type"))
+
+    def test_path_traversal_is_refused(self):
+        status, _, _ = self.client().request("/static/../app.py")
+        self.assertEqual(status, 404)
+
+    def test_missing_asset_is_404(self):
+        status, _, _ = self.client().request("/static/nope.js")
+        self.assertEqual(status, 404)
+
+    def test_piles_are_fetched_separately(self):
+        c = self.client()
+        c.request("/action", {"type": "new_run", "cls": "sentinel"})
+        _, state, _ = c.request("/action", {"type": "map", "idx": 0})
+        if state["screen"] != "combat":
+            self.skipTest("this seed did not open on a combat node")
+        # counts travel with state; contents do not
+        self.assertIn("draw", state["combat"])
+        self.assertNotIn("draw_pile", state["combat"])
+        _, piles, _ = c.request("/piles")
+        self.assertEqual(len(piles["draw_pile"]), state["combat"]["draw"])
+
+    def test_piles_outside_combat_are_empty(self):
+        c = self.client()
+        c.request("/action", {"type": "new_run", "cls": "sentinel"})
+        _, piles, _ = c.request("/piles")
+        self.assertEqual(piles["draw_pile"], [])
+
+
 class TestDto(unittest.TestCase):
     def test_view_is_json_serialisable_on_every_screen(self):
         for seed in range(8):

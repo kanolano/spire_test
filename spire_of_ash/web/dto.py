@@ -72,6 +72,19 @@ def _class_roster():
 CLASS_ROSTER = _class_roster()
 
 
+def piles_view(run):
+    """Pile contents, fetched only when the player opens the overlay."""
+    cb = run.combat
+    if not cb:
+        return {"draw_pile": [], "discard_pile": [], "exhaust_pile": []}
+    return {
+        # the real draw order stays hidden
+        "draw_pile": sorted_cards(cb.draw_pile),
+        "discard_pile": [card_data(k) for k in cb.discard],
+        "exhaust_pile": [card_data(k) for k in cb.exhausted],
+    }
+
+
 def view(run):
     """The full view model for one run."""
     st = run.state()
@@ -94,9 +107,9 @@ def view(run):
                 e["intent"] = dict(e["intent"], name=src.intent,
                                    dmg=e["intent"].get("damage"))
         c["hand"] = cards_data(cb.hand, cb.energy)
-        c["draw_pile"] = sorted_cards(cb.draw_pile)
-        c["discard_pile"] = [card_data(k) for k in cb.discard]
-        c["exhaust_pile"] = [card_data(k) for k in cb.exhausted]
+        # The three pile *contents* used to ship with every single response and
+        # were only read when the player opened an overlay. Counts travel here;
+        # the cards come from /piles on demand.
 
     if run.reward:
         r = run.reward

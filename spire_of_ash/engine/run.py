@@ -463,7 +463,7 @@ class Run:
                 "name": p.name, "cls": p.cls, "hp": p.hp, "max_hp": p.max_hp,
                 "block": p.block, "gold": p.gold, "deck_size": len(p.deck),
                 "statuses": p.statuses(), "relics": list(p.relics),
-                "potions": list(p.potions),
+                "potions": list(p.potions), "max_potions": p.max_potions,
                 "energy": cb.energy if cb else 0, "max_energy": p.max_energy,
             },
             "deck": [k.to_dict() for k in p.deck],
