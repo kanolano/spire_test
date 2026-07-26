@@ -7,3 +7,9 @@ __pycache__/
 # local run data
 spire_save.json
 runs/
+
+# editor / tooling
+.claude/
+.mcp.json
+.idea/
+.vscode/

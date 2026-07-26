@@ -5,21 +5,31 @@ library — nothing to install, no build step, no JavaScript framework.
 
 ## Running
 
-Browser (recommended):
+Browser:
 
 ```sh
-python3 spire_web.py            # serves http://localhost:8765 and opens it
-python3 spire_web.py 9000       # pick a port
-python3 spire_web.py --no-open  # don't launch a browser
+python3 -m spire_of_ash.web             # serves http://localhost:8765 and opens it
+python3 -m spire_of_ash.web 9000        # pick a port
+python3 -m spire_of_ash.web --no-open   # don't launch a browser
 ```
 
 Terminal:
 
 ```sh
-python3 spire.py
+python3 -m spire_of_ash.term
+python3 -m spire_of_ash.term --seed 42  # replay a reproducible run
 ```
 
-Requires Python 3.10+.
+Requires Python 3.10+. Installing the package (`pip install -e .`) also gives you
+`spire` and `spire-web` commands.
+
+## Tests
+
+```sh
+python3 -m unittest discover -s tests
+```
+
+No dependencies needed. `pytest` works too if you have it.
 
 ## How it plays
 
@@ -31,18 +41,29 @@ relics and card removal, and `?` in-game lists every key binding.
 The browser UI is fully keyboard-driven — number keys play cards, `a`–`d` pick
 targets and map nodes, `e` ends the turn, `i` opens your deck.
 
-## Layout
+## Architecture
 
-| File | Purpose |
+The engine is pure: it never reads stdin and never prints. Both front-ends are
+clients of the same state machine, which is what keeps them from drifting apart.
+
+```
+run.state()        a snapshot of engine state — no side effects
+run.apply(action)  advance the machine; raises InvalidAction if refused
+run.pending        what the run is waiting for right now
+```
+
+| Path | Purpose |
 | --- | --- |
-| `spire.py` | Game engine plus the terminal UI |
-| `spire_web.py` | HTTP server exposing the engine as JSON |
-| `spire_ui.html` | Self-contained browser client |
-| `spire_save.json` | Top-10 leaderboard (generated, git-ignored) |
+| `spire_of_ash/engine/` | Rules: cards, combatants, combat, the `Run` state machine, map generation |
+| `spire_of_ash/content/` | Data tables: cards, monsters, relics, potions, events, classes |
+| `spire_of_ash/balance.py` | Every tuning number, in one place |
+| `spire_of_ash/web/` | HTTP server, per-session runs, view model, browser client |
+| `spire_of_ash/term/` | Terminal client and all ANSI rendering |
+| `tests/` | Rules, flow, persistence, content integrity and HTTP tests |
 
-## Status
+Where a card needs a choice the player has to make (True Grit+ picking a card to
+exhaust), the client sends that choice with the action — `Card.requires` says
+which. The engine never blocks waiting for input.
 
-This is the consolidated baseline. A refactor is underway to separate the engine
-from terminal I/O, split the flat modules into a `spire_of_ash` package, support
-multiple concurrent players with resumable runs, and add a test suite. See the
-project plan for details.
+Runs are seeded and serialisable, so they are reproducible, resumable across a
+server restart, and testable.

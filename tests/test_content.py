@@ -1,0 +1,255 @@
+"""Relic hooks and content-table integrity.
+
+The integrity tests are cheap insurance: a card key typo'd into a class pool used
+to surface as a KeyError mid-run, on a seed you could not reproduce.
+"""
+
+import unittest
+
+from helpers import make_combat
+
+from spire_of_ash import balance as B
+from spire_of_ash.content.cards import CARDS
+from spire_of_ash.content.classes import CLASSES, DEFAULT_CLASS
+from spire_of_ash.content.events import EVENTS
+from spire_of_ash.content.monsters import MONSTERS
+from spire_of_ash.content.pools import random_card_keys, roll_relic
+from spire_of_ash.content.potions import POTIONS
+from spire_of_ash.content.relics import RELIC_POOL, RELICS, STARTER_RELICS
+from spire_of_ash.engine.card import Card
+from spire_of_ash.engine.combatant import Player
+from spire_of_ash.engine.dungeon import ACT_POOLS
+from spire_of_ash.rng import Rng
+from spire_of_ash.statuses import STATUS_LABELS
+
+HOOKS = {"on_pickup", "on_combat_start", "on_turn_start", "on_turn_end",
+         "on_combat_end", "on_attack", "draw_bonus"}
+
+
+class TestRelicHooks(unittest.TestCase):
+    def relic_combat(self, relic):
+        cb = make_combat()
+        cb.player.relics = [relic]
+        return cb
+
+    def test_vajra_grants_strength_at_combat_start(self):
+        cb = self.relic_combat("vajra")
+        cb.start_combat()
+        self.assertEqual(cb.player.s("strength"), 1)
+
+    def test_bag_of_marbles_debuffs_every_enemy(self):
+        cb = make_combat(("cultist", "jaw_worm"))
+        cb.player.relics = ["bag_of_marbles"]
+        cb.start_combat()
+        self.assertTrue(all(e.s("vulnerable") == 1 for e in cb.enemies))
+
+    def test_anchor_only_blocks_on_the_first_turn(self):
+        cb = self.relic_combat("anchor")
+        cb.start_combat()
+        cb.player_turn_start()
+        self.assertGreaterEqual(cb.player.block, B.ANCHOR_BLOCK)
+        cb.turn = 1
+        cb.player_turn_start()
+        self.assertEqual(cb.player.block, 0)
+
+    def test_bag_of_prep_draws_extra_on_turn_one_only(self):
+        cb = self.relic_combat("bag_of_prep")
+        cb.start_combat()
+        cb.player_turn_start()
+        self.assertEqual(len(cb.hand), B.BASE_DRAW + B.BAG_OF_PREP_EXTRA)
+        # put the hand back so the pile can reshuffle, or the next draw runs dry
+        cb.discard.extend(cb.hand)
+        cb.hand = []
+        cb.turn = 1
+        cb.player_turn_start()
+        self.assertEqual(len(cb.hand), B.BASE_DRAW)
+
+    def test_pen_nib_doubles_every_tenth_attack(self):
+        cb = self.relic_combat("pen_nib")
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.max_hp = foe.hp = 10_000
+        cb.attacks_total = 9        # the next attack is the 10th
+        before = foe.hp
+        cb.player_attack(foe, 10)
+        self.assertEqual(before - foe.hp, 20)
+
+    def test_pen_nib_leaves_other_attacks_alone(self):
+        cb = self.relic_combat("pen_nib")
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.max_hp = foe.hp = 10_000
+        cb.attacks_total = 0
+        before = foe.hp
+        cb.player_attack(foe, 10)
+        self.assertEqual(before - foe.hp, 10)
+
+    def test_kunai_grants_dexterity_every_third_attack(self):
+        cb = self.relic_combat("kunai")
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.max_hp = foe.hp = 10_000
+        for _ in range(3):
+            cb.player_attack(foe, 1)
+        self.assertEqual(cb.player.s("dexterity"), 1)
+
+    def test_burning_blood_heals_after_combat(self):
+        cb = self.relic_combat("burning_blood")
+        cb.player.hp = cb.player.max_hp - 20
+        before = cb.player.hp
+        cb.end_combat()
+        self.assertEqual(cb.player.hp, before + B.BURNING_BLOOD_HEAL)
+
+    def test_meat_on_bone_only_heals_below_half(self):
+        cb = self.relic_combat("meat_on_bone")
+        cb.player.hp = cb.player.max_hp - 1
+        before = cb.player.hp
+        cb.end_combat()
+        self.assertEqual(cb.player.hp, before)
+
+        cb.player.hp = cb.player.max_hp // 4
+        before = cb.player.hp
+        cb.end_combat()
+        self.assertEqual(cb.player.hp, before + B.MEAT_ON_BONE_HEAL)
+
+    def test_art_of_war_rewards_an_attackless_turn(self):
+        cb = self.relic_combat("art_of_war")
+        cb.start_combat()
+        cb.player_turn_start()
+        cb.attacked_this_turn = False
+        cb.player_turn_end()
+        self.assertEqual(cb.bonus_energy_next, 1)
+
+    def test_art_of_war_stays_quiet_after_an_attack(self):
+        cb = self.relic_combat("art_of_war")
+        cb.start_combat()
+        cb.player_turn_start()
+        cb.attacked_this_turn = True
+        cb.player_turn_end()
+        self.assertEqual(cb.bonus_energy_next, 0)
+
+    def test_strawberry_raises_max_hp_on_pickup(self):
+        p = Player("sentinel")
+        before = p.max_hp
+        p.add_relic("strawberry")
+        self.assertEqual(p.max_hp, before + B.STRAWBERRY_MAX_HP)
+        self.assertEqual(p.hp, before + B.STRAWBERRY_MAX_HP)
+
+    def test_happy_flower_gives_energy_every_third_turn(self):
+        cb = self.relic_combat("happy_flower")
+        cb.start_combat()
+        cb.turn = 2                 # (turn + 1) % 3 == 0
+        cb.player_turn_start()
+        self.assertEqual(cb.energy, cb.player.max_energy + 1)
+
+    def test_every_relic_hook_name_is_recognised(self):
+        for key, spec in RELICS.items():
+            for field in spec:
+                if field in ("name", "desc"):
+                    continue
+                self.assertIn(field, HOOKS, f"{key} declares unknown hook {field!r}")
+
+    def test_every_relic_can_be_picked_up_and_fires_cleanly(self):
+        """A smoke test over the whole table, so a new relic can't crash a run."""
+        for key in RELICS:
+            cb = make_combat()
+            cb.player.relics = []
+            cb.player.add_relic(key)
+            cb.start_combat()
+            cb.player_turn_start()
+            cb.player_attack(cb.enemies[0], 1)
+            cb.player_turn_end()
+            cb.end_combat()
+
+
+class TestContentIntegrity(unittest.TestCase):
+    def test_class_decks_and_pools_reference_real_cards(self):
+        for cls, d in CLASSES.items():
+            for key in d["deck"] + d["common"] + d["uncommon"] + d["rare"]:
+                self.assertIn(key, CARDS, f"{cls} references missing card {key!r}")
+
+    def test_class_relics_exist(self):
+        for cls, d in CLASSES.items():
+            self.assertIn(d["relic"], RELICS, f"{cls} has a missing relic")
+
+    def test_default_class_exists(self):
+        self.assertIn(DEFAULT_CLASS, CLASSES)
+
+    def test_starter_relics_never_drop(self):
+        self.assertTrue(STARTER_RELICS)
+        self.assertFalse(set(RELIC_POOL) & STARTER_RELICS)
+
+    def test_every_card_can_be_constructed(self):
+        for key in CARDS:
+            card = Card(key)
+            self.assertTrue(card.name)
+            self.assertTrue(card.desc)
+            self.assertTrue(Card(key, upgraded=True).name.endswith("+"))
+
+    def test_card_types_are_known(self):
+        for key, d in CARDS.items():
+            self.assertIn(d["type"],
+                          ("ATTACK", "SKILL", "POWER", "CURSE", "STATUS"),
+                          f"{key} has an odd type")
+
+    def test_act_pools_reference_real_monsters(self):
+        for act, pools in ACT_POOLS.items():
+            for group in pools["weak"] + pools["strong"]:
+                for key in group:
+                    self.assertIn(key, MONSTERS, f"act {act} references {key!r}")
+            for key in pools["elite"] + pools["boss"]:
+                self.assertIn(key, MONSTERS, f"act {act} references {key!r}")
+
+    def test_elites_and_bosses_are_flagged(self):
+        for act, pools in ACT_POOLS.items():
+            for key in pools["elite"]:
+                self.assertTrue(MONSTERS[key].get("elite"), f"{key} is not elite")
+            for key in pools["boss"]:
+                self.assertTrue(MONSTERS[key].get("boss"), f"{key} is not a boss")
+
+    def test_monster_moves_are_well_formed(self):
+        for key, spec in MONSTERS.items():
+            self.assertTrue(spec["moves"], f"{key} has no moves")
+            self.assertIn("pick", spec, f"{key} has no move picker")
+            lo, hi = spec["hp"]
+            self.assertLessEqual(lo, hi, f"{key} has a backwards hp range")
+
+    def test_potions_are_well_formed(self):
+        for key, spec in POTIONS.items():
+            self.assertTrue(spec["name"] and spec["desc"])
+            self.assertTrue(callable(spec["fx"]), f"{key} has no effect")
+
+    def test_events_are_well_formed(self):
+        for ev in EVENTS:
+            self.assertTrue(ev["title"] and ev["text"])
+            self.assertTrue(ev["options"], f"{ev['title']} has no options")
+            for label, fn in ev["options"]:
+                self.assertTrue(label)
+                self.assertTrue(callable(fn))
+
+    def test_statuses_used_by_cards_have_labels(self):
+        """Anything shown to the player needs a label to render."""
+        for key in ("strength", "dexterity", "vulnerable", "weak", "frail",
+                    "poison", "thorns"):
+            self.assertTrue(STATUS_LABELS.get(key))
+
+    def test_random_card_keys_respects_the_class(self):
+        rng = Rng(5)
+        pool = set(CLASSES["ashwalker"]["common"] + CLASSES["ashwalker"]["uncommon"]
+                   + CLASSES["ashwalker"]["rare"])
+        keys = random_card_keys(rng, 3, cls="ashwalker")
+        self.assertEqual(len(set(keys)), 3, "keys must be distinct")
+        self.assertTrue(set(keys) <= pool)
+
+    def test_roll_relic_avoids_owned_relics(self):
+        rng = Rng(5)
+        owned = list(RELIC_POOL[:-1])
+        self.assertEqual(roll_relic(rng, owned), RELIC_POOL[-1])
+
+    def test_roll_relic_falls_back_when_all_are_owned(self):
+        rng = Rng(5)
+        self.assertIn(roll_relic(rng, list(RELIC_POOL)), RELIC_POOL)
+
+
+if __name__ == "__main__":
+    unittest.main()
