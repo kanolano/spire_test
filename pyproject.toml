@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spire-of-ash"
+version = "0.1.0"
+description = "A roguelike deckbuilder that plays in the terminal or the browser."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+# NOTE: flat modules for now. The package split into spire_of_ash/{engine,content,web,term}
+# is in progress; this section moves to `packages = ["spire_of_ash"]` when it lands.
+[tool.setuptools]
+py-modules = ["spire", "spire_web"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

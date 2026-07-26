@@ -105,6 +105,21 @@ def intent_data(enemy, player):
     return d
 
 
+def class_data():
+    """The roster for the character-select screen."""
+    out = []
+    for key, d in spire.CLASSES.items():
+        starters = sorted({spire.CARDS[k]["name"] for k in d["deck"]})
+        out.append({
+            "key": key, "name": d["name"], "hp": d["hp"], "energy": d["energy"],
+            "blurb": d["blurb"], "deck": starters,
+            "relic": {"name": spire.RELICS[d["relic"]]["name"],
+                      "desc": spire.RELICS[d["relic"]]["desc"]},
+            "cards": len(d["common"]) + len(d["uncommon"]) + len(d["rare"]),
+        })
+    return out
+
+
 def relic_data(player):
     return [{"name": spire.RELICS[r]["name"], "desc": spire.RELICS[r]["desc"]}
             for r in player.relics]
@@ -135,8 +150,9 @@ class Session:
         self.new_run()
 
     # ── lifecycle ──
-    def new_run(self):
-        self.player = spire.Player()
+    def new_run(self, cls=None):
+        """No class yet → park on the select screen; the UI posts one back."""
+        self.player = spire.Player(cls or spire.DEFAULT_CLASS)
         spire.PLAYER_REF[0] = self.player
         self.act = 1
         self.floors = spire.generate_map()
@@ -153,7 +169,7 @@ class Session:
         self.treasure = None
         self.banner = None
         self.killer = "—"
-        self.screen = "map"
+        self.screen = "map" if cls else "select"
 
     # ── helpers ──
     def reachable(self):
@@ -181,7 +197,7 @@ class Session:
     def save_record(self, won):
         spire.save_record(dict(act=self.act, floors=self.floors_cleared, won=won,
                                killer=self.killer, deck=len(self.player.deck),
-                               gold=self.player.gold))
+                               gold=self.player.gold, cls=self.player.name))
 
     # ── map ──
     def enter_node(self, idx):
@@ -486,8 +502,10 @@ class Session:
             "elites_killed": self.elites_killed,
             "banner": self.banner,
             "killer": self.killer,
+            "classes": class_data(),
             "player": {
-                "name": p.name, "hp": p.hp, "max_hp": p.max_hp, "block": p.block,
+                "name": p.name, "cls": p.cls,
+                "hp": p.hp, "max_hp": p.max_hp, "block": p.block,
                 "gold": p.gold, "deck_size": len(p.deck),
                 "statuses": status_data(p),
                 "relics": relic_data(p), "potions": potion_data(p),
@@ -538,7 +556,7 @@ class Session:
     def act_on(self, a):
         t = a.get("type")
         if t == "new_run":
-            self.new_run()
+            self.new_run(a.get("cls"))
         elif t == "map":
             self.enter_node(a.get("idx", -1))
         elif t == "play":

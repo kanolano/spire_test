@@ -1,6 +1,12 @@
-"""Spire of Ash — a Slay the Spire-like deckbuilding roguelike for the terminal.
+"""Spire of Ash — a Slay the Spire-like deckbuilding roguelike.
 
-Stdlib only. Run with:  python3 spire.py
+Stdlib only.  This is the terminal front-end:
+
+    python3 spire.py
+
+For the mouse-driven browser version (same engine), run:
+
+    python3 spire_web.py
 """
 import json
 import os
@@ -82,6 +88,10 @@ STATUS_INFO = {
     "feelnopain": ("NoPain", CYN),
     "rupture": ("Rupt", RED),
     "juggernaut": ("Jugg", YEL),
+    "venombloom": ("Bloom", GRN),
+    "afterimage": ("After", CYN),
+    "thousandcuts": ("Cuts", RED),
+    "envenom": ("Envm", GRN),
     "flexloss": ("", 0),
     "asleep": ("Asleep", GRY),
 }
@@ -313,6 +323,141 @@ CARDS = {
                         desc="Double your Strength. Exhaust.", udesc="Double your Strength.",
                         fx=lambda cb, k, t: cb.apply(cb.player, "strength",
                                                      cb.player.s("strength"))),
+    # ══ ashwalker ══════════════════════════════════════════════════════════
+    # ── starter ──
+    "cinder_dart": dict(name="Cinder Dart", type="ATTACK", cost=0, targeted=True,
+                        rarity="starter",
+                        desc="Deal 4 damage. Apply 1 Weak.",
+                        udesc="Deal 6 damage. Apply 2 Weak.",
+                        fx=lambda cb, k, t: (cb.player_attack(t, k.v(4, 6)),
+                                             cb.apply(t, "weak", k.v(1, 2)))),
+    # ── common ──
+    "quick_slash": dict(name="Quick Slash", type="ATTACK", cost=1, targeted=True,
+                        desc="Deal 8 damage. Draw 1 card.",
+                        udesc="Deal 10 damage. Draw 1 card.",
+                        fx=lambda cb, k, t: (cb.player_attack(t, k.v(8, 10)), cb.draw(1))),
+    "venom_dagger": dict(name="Venom Dagger", type="ATTACK", cost=1, targeted=True,
+                         desc="Deal 5 damage. Apply 2 Poison.",
+                         udesc="Deal 6 damage. Apply 3 Poison.",
+                         fx=lambda cb, k, t: (cb.player_attack(t, k.v(5, 6)),
+                                              cb.apply(t, "poison", k.v(2, 3)))),
+    "flechettes": dict(name="Flechettes", type="ATTACK", cost=1, targeted=True,
+                       desc="Deal 4 damage twice.", udesc="Deal 4 damage three times.",
+                       fx=lambda cb, k, t: cb.player_attack(t, 4, times=k.v(2, 3))),
+    "sneak_attack": dict(name="Sneak Attack", type="ATTACK", cost=2, targeted=True,
+                         desc="Deal 12 damage. Apply 2 Weak.",
+                         udesc="Deal 16 damage. Apply 3 Weak.",
+                         fx=lambda cb, k, t: (cb.player_attack(t, k.v(12, 16)),
+                                              cb.apply(t, "weak", k.v(2, 3)))),
+    "slice_and_dice": dict(name="Slice and Dice", type="ATTACK", cost=1,
+                           desc="Deal 6 damage to ALL enemies.",
+                           udesc="Deal 8 damage to ALL enemies.",
+                           fx=lambda cb, k, t: [cb.player_attack(e, k.v(6, 8))
+                                                for e in cb.living()]),
+    "dodge_roll": dict(name="Dodge Roll", type="SKILL", cost=1,
+                       desc="Gain 6 Block. Draw 1 card.", udesc="Gain 9 Block. Draw 1 card.",
+                       fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(6, 9)), cb.draw(1))),
+    "cloak": dict(name="Cloak of Cinders", type="SKILL", cost=1,
+                  desc="Gain 5 Block. Gain 1 Dexterity.",
+                  udesc="Gain 7 Block. Gain 1 Dexterity.",
+                  fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(5, 7)),
+                                       cb.apply(cb.player, "dexterity", 1))),
+    "backflip": dict(name="Backflip", type="SKILL", cost=1,
+                     desc="Gain 5 Block. Draw 2 cards.", udesc="Gain 8 Block. Draw 2 cards.",
+                     fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(5, 8)), cb.draw(2))),
+    "acrobatics": dict(name="Acrobatics", type="SKILL", cost=1,
+                       desc="Draw 3 cards, then discard 1 card at random.",
+                       udesc="Draw 4 cards, then discard 1 card at random.",
+                       fx=lambda cb, k, t: (cb.draw(k.v(3, 4)), cb.discard_random(1))),
+    "smoke_bomb": dict(name="Smoke Bomb", type="SKILL", cost=1,
+                       desc="Apply 2 Weak to ALL enemies.",
+                       udesc="Apply 3 Weak to ALL enemies.",
+                       fx=lambda cb, k, t: [cb.apply(e, "weak", k.v(2, 3))
+                                            for e in cb.living()]),
+    "toxic_vial": dict(name="Toxic Vial", type="SKILL", cost=0, targeted=True,
+                       desc="Apply 3 Poison.", udesc="Apply 5 Poison.",
+                       fx=lambda cb, k, t: cb.apply(t, "poison", k.v(3, 5))),
+    # ── uncommon ──
+    "deadly_poison": dict(name="Deadly Poison", type="SKILL", cost=1, targeted=True,
+                          rarity="uncommon",
+                          desc="Apply 6 Poison.", udesc="Apply 9 Poison.",
+                          fx=lambda cb, k, t: cb.apply(t, "poison", k.v(6, 9))),
+    "blade_dance": dict(name="Blade Dance", type="ATTACK", cost=1, targeted=True,
+                        rarity="uncommon",
+                        desc="Deal 4 damage three times.", udesc="Deal 4 damage four times.",
+                        fx=lambda cb, k, t: cb.player_attack(t, 4, times=k.v(3, 4))),
+    "footwork": dict(name="Footwork", type="POWER", cost=1, rarity="uncommon",
+                     desc="Gain 2 Dexterity.", udesc="Gain 3 Dexterity.",
+                     fx=lambda cb, k, t: cb.apply(cb.player, "dexterity", k.v(2, 3))),
+    "crippling_cloud": dict(name="Crippling Cloud", type="SKILL", cost=2, rarity="uncommon",
+                            exhaust=True,
+                            desc="Apply 4 Poison and 2 Weak to ALL enemies. Exhaust.",
+                            udesc="Apply 7 Poison and 2 Weak to ALL enemies. Exhaust.",
+                            fx=lambda cb, k, t: [(cb.apply(e, "poison", k.v(4, 7)),
+                                                  cb.apply(e, "weak", 2))
+                                                 for e in cb.living()]),
+    "well_laid_plans": dict(name="Well-Laid Plans", type="SKILL", cost=1, rarity="uncommon",
+                            desc="Gain 8 Block. Gain 1 Dexterity.",
+                            udesc="Gain 11 Block. Gain 2 Dexterity.",
+                            fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(8, 11)),
+                                                 cb.apply(cb.player, "dexterity", k.v(1, 2)))),
+    "catalyst": dict(name="Catalyst", type="SKILL", cost=2, ucost=1, targeted=True,
+                     rarity="uncommon", exhaust=True,
+                     desc="Double an enemy's Poison. Exhaust.",
+                     udesc="Triple an enemy's Poison. Exhaust.",
+                     fx=lambda cb, k, t: cb.multiply_poison(t, k.v(2, 3))),
+    "dagger_spray": dict(name="Dagger Spray", type="ATTACK", cost=1, rarity="uncommon",
+                         desc="Deal 4 damage to ALL enemies twice.",
+                         udesc="Deal 6 damage to ALL enemies twice.",
+                         fx=lambda cb, k, t: [cb.player_attack(e, k.v(4, 6))
+                                              for _ in range(2) for e in cb.living()]),
+    "escape_plan": dict(name="Escape Plan", type="SKILL", cost=0, rarity="uncommon",
+                        desc="Draw 1 card. Gain 3 Block.", udesc="Draw 1 card. Gain 5 Block.",
+                        fx=lambda cb, k, t: (cb.draw(1),
+                                             cb.gain_block(cb.player, k.v(3, 5)))),
+    "bane": dict(name="Bane", type="ATTACK", cost=1, targeted=True, rarity="uncommon",
+                 desc="Deal 7 damage. Deal 7 more if the target is Poisoned.",
+                 udesc="Deal 10 damage. Deal 10 more if the target is Poisoned.",
+                 fx=lambda cb, k, t: cb.bane(t, k.v(7, 10))),
+    "nightmare_toxin": dict(name="Nightmare Toxin", type="SKILL", cost=1, targeted=True,
+                            rarity="uncommon",
+                            desc="Apply 3 Poison and 2 Vulnerable.",
+                            udesc="Apply 4 Poison and 3 Vulnerable.",
+                            fx=lambda cb, k, t: (cb.apply(t, "poison", k.v(3, 4)),
+                                                 cb.apply(t, "vulnerable", k.v(2, 3)))),
+    "flying_knee": dict(name="Flying Knee", type="ATTACK", cost=1, targeted=True,
+                        rarity="uncommon",
+                        desc="Deal 8 damage. Gain 1 Energy next turn.",
+                        udesc="Deal 11 damage. Gain 1 Energy next turn.",
+                        fx=lambda cb, k, t: (cb.player_attack(t, k.v(8, 11)),
+                                             cb.energy_next_turn(1))),
+    # ── rare ──
+    "bouncing_flask": dict(name="Bouncing Flask", type="SKILL", cost=2, rarity="rare",
+                           desc="Apply 3 Poison to a random enemy 3 times.",
+                           udesc="Apply 3 Poison to a random enemy 4 times.",
+                           fx=lambda cb, k, t: cb.bounce_poison(3, k.v(3, 4))),
+    "venom_bloom": dict(name="Venom Bloom", type="POWER", cost=2, rarity="rare",
+                        desc="At the start of each turn, apply 2 Poison to ALL enemies.",
+                        udesc="At the start of each turn, apply 3 Poison to ALL enemies.",
+                        fx=lambda cb, k, t: cb.apply(cb.player, "venombloom", k.v(2, 3))),
+    "after_image": dict(name="After Image", type="POWER", cost=1, rarity="rare",
+                        desc="Whenever you play a card, gain 1 Block.",
+                        udesc="Whenever you play a card, gain 2 Block.",
+                        fx=lambda cb, k, t: cb.apply(cb.player, "afterimage", k.v(1, 2))),
+    "a_thousand_cuts": dict(name="A Thousand Cuts", type="POWER", cost=2, rarity="rare",
+                            desc="Whenever you play a card, deal 1 damage to ALL enemies.",
+                            udesc="Whenever you play a card, deal 2 damage to ALL enemies.",
+                            fx=lambda cb, k, t: cb.apply(cb.player, "thousandcuts", k.v(1, 2))),
+    "envenom": dict(name="Envenom", type="POWER", cost=2, ucost=1, rarity="rare",
+                    desc="Whenever an attack deals unblocked damage, apply 1 Poison.",
+                    udesc="Whenever an attack deals unblocked damage, apply 2 Poison.",
+                    fx=lambda cb, k, t: cb.apply(cb.player, "envenom", k.v(1, 2))),
+    "grand_finale": dict(name="Grand Finale", type="ATTACK", cost=3, rarity="rare",
+                         exhaust=True,
+                         desc="Deal 20 damage to ALL enemies. Exhaust.",
+                         udesc="Deal 26 damage to ALL enemies. Exhaust.",
+                         fx=lambda cb, k, t: [cb.player_attack(e, k.v(20, 26))
+                                              for e in cb.living()]),
     # ── statuses & curses ──
     "wound": dict(name="Wound", type="STATUS", cost=0, playable=False, upgradable=False,
                   rarity="none", desc="Unplayable."),
@@ -325,22 +470,54 @@ CARDS = {
                                        "per card in your hand."),
 }
 
-COMMON_POOL = ["cleave", "twin_strike", "pommel_strike", "iron_wave", "clothesline",
-               "body_slam", "shrug_it_off", "flex", "true_grit", "bloodletting", "armaments"]
-UNCOMMON_POOL = ["uppercut", "heavy_blade", "whirlwind", "seeing_red", "offering",
-                 "second_wind", "inflame", "metallicize", "feel_no_pain", "rupture",
-                 "disarm", "shockwave", "poison_stab", "battle_trance"]
-RARE_POOL = ["bludgeon", "reaper", "impervious", "demon_form", "barricade", "juggernaut",
-             "limit_break"]
+# ──────────────────────────────────────────────────────────────────── classes ──
+# Every run picks one class.  A class owns its starting deck, its starting relic
+# and its own three card pools — nothing else in the game is class-aware.
+CLASSES = {
+    "sentinel": dict(
+        name="The Sentinel", hp=75, energy=3, relic="burning_blood",
+        blurb="Ash-caked plate and a heavy blade. Strength, Block and brute arithmetic.",
+        deck=["strike"] * 5 + ["defend"] * 4 + ["bash"],
+        common=["cleave", "twin_strike", "pommel_strike", "iron_wave", "clothesline",
+                "body_slam", "shrug_it_off", "flex", "true_grit", "bloodletting", "armaments"],
+        uncommon=["uppercut", "heavy_blade", "whirlwind", "seeing_red", "offering",
+                  "second_wind", "inflame", "metallicize", "feel_no_pain", "rupture",
+                  "disarm", "shockwave", "poison_stab", "battle_trance"],
+        rare=["bludgeon", "reaper", "impervious", "demon_form", "barricade", "juggernaut",
+              "limit_break"],
+    ),
+    "ashwalker": dict(
+        name="The Ashwalker", hp=68, energy=3, relic="ash_phial",
+        blurb="Cinder-smoke and a thin knife. Poison, Weak and a great many small cuts.",
+        deck=["strike"] * 5 + ["defend"] * 4 + ["cinder_dart"],
+        common=["quick_slash", "venom_dagger", "flechettes", "sneak_attack", "slice_and_dice",
+                "dodge_roll", "cloak", "backflip", "acrobatics", "smoke_bomb", "toxic_vial"],
+        uncommon=["deadly_poison", "blade_dance", "footwork", "crippling_cloud",
+                  "well_laid_plans", "catalyst", "dagger_spray", "escape_plan", "bane",
+                  "nightmare_toxin", "flying_knee"],
+        rare=["bouncing_flask", "venom_bloom", "after_image", "a_thousand_cuts", "envenom",
+              "grand_finale"],
+    ),
+}
+DEFAULT_CLASS = "sentinel"
 
 
-def random_card_keys(n, chances=(0.62, 0.31, 0.07)):
-    """Pick n distinct card keys weighted by rarity."""
+def class_of(cls=None):
+    """Resolve a class key, falling back to the class of the run in progress."""
+    if cls in CLASSES:
+        return cls
+    p = PLAYER_REF[0]
+    return getattr(p, "cls", DEFAULT_CLASS) if p else DEFAULT_CLASS
+
+
+def random_card_keys(n, chances=(0.62, 0.31, 0.07), cls=None):
+    """Pick n distinct card keys from one class's pools, weighted by rarity."""
+    d = CLASSES[class_of(cls)]
     keys = []
     while len(keys) < n:
         r = random.random()
-        pool = COMMON_POOL if r < chances[0] else (
-            UNCOMMON_POOL if r < chances[0] + chances[1] else RARE_POOL)
+        pool = d["common"] if r < chances[0] else (
+            d["uncommon"] if r < chances[0] + chances[1] else d["rare"])
         k = random.choice(pool)
         if k not in keys:
             keys.append(k)
@@ -647,8 +824,11 @@ RELICS = {
     "bag_of_prep": dict(name="Bag of Preparation", desc="Draw 2 extra cards on turn 1."),
     "art_of_war": dict(name="Art of War", desc="If you play no Attacks in a turn, "
                                                "gain 1 Energy next turn."),
+    "ash_phial": dict(name="Ash Phial", desc="At combat start, apply 2 Poison to ALL enemies."),
 }
-RELIC_POOL = [k for k in RELICS if k != "burning_blood"]
+# starting relics are handed out by class, never dropped
+STARTER_RELICS = {d["relic"] for d in CLASSES.values()}
+RELIC_POOL = [k for k in RELICS if k not in STARTER_RELICS]
 
 
 # ───────────────────────────────────────────────────────────────────── potions ──
@@ -675,13 +855,14 @@ POTIONS = {
 
 # ────────────────────────────────────────────────────────────────────── player ──
 class Player(Combatant):
-    def __init__(self):
-        super().__init__("The Sentinel", 75)
+    def __init__(self, cls=DEFAULT_CLASS):
+        self.cls = cls if cls in CLASSES else DEFAULT_CLASS
+        d = CLASSES[self.cls]
+        super().__init__(d["name"], d["hp"])
         self.gold = 99
-        self.max_energy = 3
-        self.deck = [Card("strike") for _ in range(5)] + \
-                    [Card("defend") for _ in range(4)] + [Card("bash")]
-        self.relics = ["burning_blood"]
+        self.max_energy = d["energy"]
+        self.deck = [Card(k) for k in d["deck"]]
+        self.relics = [d["relic"]]
         self.potions = []
         self.max_potions = 3
 
@@ -752,7 +933,9 @@ class Combat:
                     self.msg(c("Pen Nib doubles the blow!", YEL))
                 if self.player.has("kunai") and self.attacks_this_turn % 3 == 0:
                     self.apply(self.player, "dexterity", 1)
-            self.damage(target, dmg)
+            lost = self.damage(target, dmg)
+            if lost > 0 and not potion and self.player.s("envenom"):
+                self.apply(target, "poison", self.player.s("envenom"))
             if target.s("thorns") and not potion:
                 self.lose_hp(self.player, target.s("thorns"))
 
@@ -873,6 +1056,52 @@ class Combat:
         self.exhaust_card(card)
         self.msg(f"Exhausted {card.name}.")
 
+    # ── ashwalker helpers ──
+    def discard_random(self, n):
+        for _ in range(n):
+            if not self.hand:
+                return
+            card = self.hand.pop(random.randrange(len(self.hand)))
+            self.discard.append(card)
+            self.msg(f"Discarded {card.name}.")
+
+    def multiply_poison(self, target, mult):
+        if not target or not target.alive:
+            return
+        cur = target.s("poison")
+        if cur <= 0:
+            self.msg(c(f"{target.name} carries no Poison.", GRY))
+            return
+        self.apply(target, "poison", cur * (mult - 1))
+        self.msg(c(f"The venom in {target.name} blooms to {target.s('poison')}.", GRN))
+
+    def bounce_poison(self, amount, times):
+        for _ in range(times):
+            alive = self.living()
+            if not alive:
+                return
+            self.apply(random.choice(alive), "poison", amount)
+
+    def bane(self, target, dmg):
+        if not target:
+            return
+        poisoned = target.s("poison") > 0
+        self.player_attack(target, dmg)
+        if poisoned:
+            self.player_attack(target, dmg)
+
+    def energy_next_turn(self, n):
+        self.bonus_energy_next += n
+
+    def on_card_played(self):
+        """After Image / A Thousand Cuts fire once per card played."""
+        p = self.player
+        if p.s("afterimage"):
+            self.gain_block(p, p.s("afterimage"))
+        if p.s("thousandcuts"):
+            for e in self.living():
+                self.damage(e, p.s("thousandcuts"))
+
     def armaments(self, all_cards):
         candidates = [k for k in self.hand if k.upgradable and not k.upgraded]
         if not candidates:
@@ -969,6 +1198,9 @@ class Combat:
             self.apply(p, "thorns", 3)
         if p.has("blood_vial"):
             self.heal(p, 2)
+        if p.has("ash_phial"):
+            for e in self.enemies:
+                self.apply(e, "poison", 2)
         for e in self.enemies:
             e.roll_intent()
 
@@ -989,6 +1221,9 @@ class Combat:
             self.energy += 1
         if p.s("demonform"):
             self.apply(p, "strength", p.s("demonform"))
+        if p.s("venombloom"):
+            for e in self.living():
+                self.apply(e, "poison", p.s("venombloom"))
         if p.s("poison"):
             self.lose_hp(p, p.s("poison"))
             p.st["poison"] -= 1
@@ -1120,6 +1355,7 @@ class Combat:
         self.energy -= cost
         self.hand.pop(idx)
         CARDS[card.key].get("fx", lambda *a: None)(self, card, target)
+        self.on_card_played()
         self.msg(f"You play {card.name}.")
         if card.exhaust:
             self.exhaust_card(card)
@@ -1323,8 +1559,8 @@ def make_encounter(act, kind, floor):
 
 # ──────────────────────────────────────────────────────────────────────── game ──
 class Game:
-    def __init__(self):
-        self.player = Player()
+    def __init__(self, cls=DEFAULT_CLASS):
+        self.player = Player(cls)
         PLAYER_REF[0] = self.player
         self.act = 1
         self.floors = generate_map()
@@ -1772,11 +2008,33 @@ def title_screen():
     prompt(c("        [enter] to climb  ", YEL))
 
 
+def class_screen():
+    """Pick the character for this run. Returns a key from CLASSES."""
+    keys = list(CLASSES)
+    while True:
+        clear()
+        print(c("\n        CHOOSE YOUR CLIMBER\n", BOLD, YEL))
+        for i, key in enumerate(keys, 1):
+            d = CLASSES[key]
+            print(c(f"        ({i}) {d['name']}", BOLD, CYN) +
+                  c(f"   {d['hp']} HP   {d['energy']} energy", GRN))
+            print(c(f"            {d['blurb']}", GRY))
+            print(c(f"            Starts with {RELICS[d['relic']]['name']} — "
+                    f"{RELICS[d['relic']]['desc']}", MAG))
+            starters = sorted({CARDS[k]["name"] for k in d["deck"]})
+            print(c(f"            Deck: {', '.join(starters)}\n", WHT))
+        ans = prompt(c("        pick a number > ", YEL))
+        if ans.isdigit() and 1 <= int(ans) <= len(keys):
+            return keys[int(ans) - 1]
+        if not ans:
+            return keys[0]
+
+
 def main():
     random.seed()
     while True:
         title_screen()
-        g = Game()
+        g = Game(class_screen())
         killer = "—"
         try:
             result = g.play()
@@ -1797,7 +2055,7 @@ def main():
         print(c("   Relics: " + ", ".join(RELICS[r]["name"] for r in p.relics), MAG))
         print()
         save_record(dict(act=g.act, floors=g.floors_cleared, won=won, killer=killer,
-                         deck=len(p.deck), gold=p.gold))
+                         deck=len(p.deck), gold=p.gold, cls=p.name))
         if not prompt(c("   Climb again? (y/N) ", YEL)).lower().startswith("y"):
             return
 
