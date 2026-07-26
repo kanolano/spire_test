@@ -141,5 +141,5 @@ def view(run):
         e = run.event
         st["event"] = {"title": e["title"], "text": e["text"],
                        "options": e["options"], "result": e["result"],
-                       "needs_removal": e["needs_removal"]}
+                       "then": e["then"]}
     return st

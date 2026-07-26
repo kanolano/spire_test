@@ -3,19 +3,23 @@ let S = null, prev = null, sel = null, busy = false;
 let lastScreen = null, lastTurn = -1;   // so animations only fire on real changes
 let pendingFx = false;                  // a fresh state to animate, not a re-render
 let offline = false;
+let dailyMode = false;                  // share today's seed with everyone else
 
 const SPRITE = {
   "Jaw Worm":"🪱","Cultist":"🧙","Red Louse":"🐜","Fungi Beast":"🍄","Acid Slime":"🟢",
   "Spike Slime":"🔵","Slime Spawn":"🫧","Mad Gremlin":"👺","Sneaky Gremlin":"🗡️",
   "Fat Gremlin":"👹","Shield Gremlin":"🛡️","Sentry":"🗿","Byrd":"🦅","Chosen":"🧛",
   "Mystic":"🧝","Gremlin Nob":"👺","Lagavulin":"🐛","Book of Stabbing":"📕",
-  "Taskmaster":"🪓","The Guardian":"🤖","Hexaghost":"👻","Slime Boss":"🟩","The Champ":"⚔️"
+  "Taskmaster":"🪓","The Guardian":"🤖","Hexaghost":"👻","Slime Boss":"🟩","The Champ":"⚔️",
+  "Ash Warden":"🛡️","The Ashen Sovereign":"👑"
 };
 const RELIC_ICON = {
   "Burning Blood":"🩸","Bag of Marbles":"🔮","Anchor":"⚓","Vajra":"🔱",
   "Oddly Smooth Stone":"🥚","Bronze Scales":"⚖️","Blood Vial":"🧪","Lantern":"🏮",
   "Happy Flower":"🌼","Pen Nib":"🖋️","Strawberry":"🍓","Meat on the Bone":"🍖",
-  "Kunai":"🗡️","Bag of Preparation":"🎒","Art of War":"📜"
+  "Kunai":"🗡️","Bag of Preparation":"🎒","Art of War":"📜","Ash Phial":"⚱️",
+  "Emberheart":"🫀","Ashglass Vial":"🫙","Smoulder Stone":"🪨","Grave Ash":"⚰️",
+  "Bone Dice":"🎲","Oathkeeper":"🕯️","Hollow Lantern":"🏮"
 };
 const POTION_ICON = {
   "Fire Potion":"🔥","Block Potion":"🛡️","Strength Potion":"💪","Energy Potion":"⚡",
@@ -486,10 +490,16 @@ function renderSelect(st){
       `<div class="cls-blurb">${esc(c.blurb)}</div>`+
       `<div class="cls-line"><b>${esc(c.relic.name)}</b> — ${esc(c.relic.desc)}</div>`+
       `<div class="cls-line">Starting deck: ${esc(c.deck.join(", "))}</div>`;
-    b.onclick = ()=> send({type:"new_run", cls:c.key});
+    b.onclick = ()=> send({type:"new_run", cls:c.key, daily:dailyMode});
     row.appendChild(b);
   });
   st.appendChild(row);
+  const toggle = ctaButton(
+    dailyMode ? "Daily climb: <b>on</b> — everyone gets the same Spire today"
+              : "Daily climb: off — each run is freshly seeded",
+    ()=>{ dailyMode = !dailyMode; render(); });
+  toggle.setAttribute("aria-pressed", String(dailyMode));
+  st.appendChild(toggle);
 }
 
 function renderEnd(st, won){

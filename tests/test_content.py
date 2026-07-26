@@ -23,7 +23,8 @@ from spire_of_ash.rng import Rng
 from spire_of_ash.statuses import STATUS_LABELS
 
 HOOKS = {"on_pickup", "on_combat_start", "on_turn_start", "on_turn_end",
-         "on_combat_end", "on_attack", "draw_bonus"}
+         "on_combat_end", "on_attack", "on_card_played", "on_exhaust",
+         "on_kill", "draw_bonus"}
 
 
 class TestRelicHooks(unittest.TestCase):
@@ -253,3 +254,137 @@ class TestContentIntegrity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNewRelicHooks(unittest.TestCase):
+    """The hooks added once relics were data, not scattered conditionals."""
+
+    def relic_combat(self, relic, enemies=("cultist",)):
+        cb = make_combat(enemies)
+        cb.player.relics = [relic]
+        return cb
+
+    def test_smoulder_stone_burns_every_enemy_each_turn(self):
+        cb = self.relic_combat("smoulder_stone", ("cultist", "jaw_worm"))
+        cb.start_combat()
+        before = [e.hp for e in cb.enemies]
+        cb.player_turn_start()
+        self.assertTrue(all(e.hp == b - B.SMOULDER_DAMAGE
+                            for e, b in zip(cb.enemies, before)))
+
+    def test_grave_ash_fires_only_on_the_first_exhaust(self):
+        cb = self.relic_combat("grave_ash")
+        cb.start_combat()
+        cb.exhaust_card(Card("strike"))
+        self.assertEqual(cb.player.s("strength"), B.GRAVE_ASH_STRENGTH)
+        cb.exhaust_card(Card("defend"))
+        self.assertEqual(cb.player.s("strength"), B.GRAVE_ASH_STRENGTH)
+
+    def test_bone_dice_draws_on_every_fourth_card(self):
+        cb = self.relic_combat("bone_dice")
+        cb.start_combat()
+        cb.hand = []
+        for _ in range(B.BONE_DICE_EVERY - 1):
+            cb.on_card_played()
+        self.assertEqual(len(cb.hand), 0)
+        cb.on_card_played()
+        self.assertEqual(len(cb.hand), 1)
+
+    def test_oathkeeper_heals_on_a_kill(self):
+        cb = self.relic_combat("oathkeeper")
+        cb.start_combat()
+        cb.player.hp = cb.player.max_hp - 20
+        before = cb.player.hp
+        cb.kill(cb.enemies[0])
+        self.assertEqual(cb.player.hp, before + B.OATHKEEPER_HEAL)
+
+    def test_hollow_lantern_trades_first_turn_energy_for_cards(self):
+        cb = self.relic_combat("hollow_lantern")
+        cb.start_combat()
+        cb.player_turn_start()
+        self.assertEqual(cb.energy, cb.player.max_energy - 1)
+        self.assertEqual(len(cb.hand), B.BASE_DRAW + 1)
+
+    def test_emberheart_grants_metallicize(self):
+        cb = self.relic_combat("emberheart")
+        cb.start_combat()
+        self.assertEqual(cb.player.s("metallicize"), 3)
+
+
+class TestEventFollowups(unittest.TestCase):
+    def run_with_event(self, title):
+        from spire_of_ash.engine.run import Run
+        run = Run("sentinel", seed=1)
+        idx = next(i for i, e in enumerate(EVENTS) if e["title"] == title)
+        run.event = {"index": idx, "title": EVENTS[idx]["title"],
+                     "text": EVENTS[idx]["text"],
+                     "options": [l for l, _ in EVENTS[idx]["options"]],
+                     "result": None, "then": None}
+        run.screen = "event"
+        return run
+
+    def test_mirror_opens_a_duplicate_picker_and_grows_the_deck(self):
+        run = self.run_with_event("THE ASHEN MIRROR")
+        before_deck, before_max = len(run.player.deck), run.player.max_hp
+        run.apply({"type": "event_choose", "idx": 0})
+        self.assertEqual(run.event["then"], "duplicate")
+        self.assertLess(run.player.max_hp, before_max)
+        run.apply({"type": "event_done"})
+        self.assertEqual(run.screen, "choose")
+        run.apply({"type": "choose", "idx": 0})
+        self.assertEqual(len(run.player.deck), before_deck + 1)
+
+    def test_forge_upgrades_when_you_can_pay(self):
+        run = self.run_with_event("THE COLD FORGE")
+        run.player.gold = 500
+        run.apply({"type": "event_choose", "idx": 0})
+        self.assertEqual(run.event["then"], "upgrade")
+        self.assertEqual(run.player.gold, 500 - 60)
+        run.apply({"type": "event_done"})
+        self.assertEqual(run.screen, "choose")
+        run.apply({"type": "choose", "idx": 0})
+        self.assertTrue(any(k.upgraded for k in run.player.deck))
+
+    def test_forge_refuses_when_you_cannot_pay(self):
+        run = self.run_with_event("THE COLD FORGE")
+        run.player.gold = 0
+        run.apply({"type": "event_choose", "idx": 0})
+        self.assertIsNone(run.event["then"])
+        run.apply({"type": "event_done"})
+        self.assertEqual(run.screen, "map")
+
+    def test_followup_is_skipped_when_no_card_qualifies(self):
+        run = self.run_with_event("THE COLD FORGE")
+        run.player.gold = 500
+        for card in run.player.deck:
+            card.upgrade()
+        run.apply({"type": "event_choose", "idx": 0})
+        run.apply({"type": "event_done"})
+        self.assertEqual(run.screen, "map")
+
+
+class TestSeeds(unittest.TestCase):
+    def test_daily_seed_is_stable_for_a_date(self):
+        import datetime
+        from spire_of_ash.seeds import daily_seed
+        day = datetime.date(2026, 7, 25)
+        self.assertEqual(daily_seed(day), daily_seed(day))
+        self.assertNotEqual(daily_seed(day), daily_seed(datetime.date(2026, 7, 26)))
+
+    def test_daily_runs_match(self):
+        from spire_of_ash.engine.run import Run
+        from spire_of_ash.seeds import daily_seed
+        a, b = Run(seed=1), Run(seed=2)
+        a.apply({"type": "new_run", "cls": "sentinel", "daily": True})
+        b.apply({"type": "new_run", "cls": "sentinel", "daily": True})
+        self.assertEqual(a.state(), b.state())
+        self.assertEqual(a.rng.seed, daily_seed())
+
+    def test_explicit_seed_is_honoured(self):
+        from spire_of_ash.engine.run import Run
+        from spire_of_ash.engine.errors import InvalidAction
+        run = Run(seed=1)
+        run.apply({"type": "new_run", "cls": "sentinel", "seed": 12345})
+        self.assertEqual(run.rng.seed, 12345)
+        with self.assertRaises(InvalidAction):
+            run.apply({"type": "new_run", "cls": "sentinel", "seed": "abc"})

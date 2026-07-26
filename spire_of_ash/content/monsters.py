@@ -199,4 +199,25 @@ MONSTERS = {
         "Anger": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 6), cb.heal(e, 20))),
     }, pick=cycle_pick(["Face Slap", "Heavy Slash", "Defensive Stance", "Execute", "Anger",
                         "Heavy Slash", "Execute"])),
+
+    "ash_warden": dict(name="Ash Warden", hp=(140, 150), elite=True, moves={
+        "Cinder Guard": mv("block", fn=lambda cb, e: (cb.gain_block(e, 14),
+                                                      cb.apply(e, "thorns", 3))),
+        "Halberd": mv("attack", 15, fn=_debuff("frail", 2)),
+        "Smother": mv("attack", 7, hits=2, fn=_add_cards("burn", 1)),
+    }, pick=weighted_pick([("Halberd", 45, 2), ("Smother", 30, 2),
+                           ("Cinder Guard", 25, 1)])),
+
+    # The act-3 finale. It opens by sealing your draw, so the fight is about the
+    # hand you are already holding.
+    "ashen_sovereign": dict(name="The Ashen Sovereign", hp=(340, 340), boss=True, moves={
+        "Sealing Gaze": mv("debuff", fn=lambda cb, e: (cb.lock_draw(),
+                                                       cb.apply(cb.player, "weak", 2))),
+        "Crown of Cinders": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 4),
+                                                         cb.gain_block(e, 20))),
+        "Sovereign's Reach": mv("attack", 13, hits=2),
+        "Immolate": mv("attack", 26, fn=_add_cards("burn", 2)),
+        "Ashfall": mv("attack", 9, hits=3, fn=_debuff("vulnerable", 2)),
+    }, pick=cycle_pick(["Sealing Gaze", "Sovereign's Reach", "Crown of Cinders",
+                        "Ashfall", "Sovereign's Reach", "Immolate"])),
 }

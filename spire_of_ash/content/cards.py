@@ -305,4 +305,38 @@ CARDS = {
     "regret": dict(name="Regret", type="CURSE", cost=0, playable=False, upgradable=False,
                    rarity="none", desc="Unplayable. At the end of your turn, lose 1 HP "
                                        "per card in your hand."),
+
+    # ── sentinel ──
+    "ember_shield": dict(name="Ember Shield", type="SKILL", cost=1,
+                         desc="Gain 4 Block. Gain 1 Thorns.",
+                         udesc="Gain 6 Block. Gain 2 Thorns.",
+                         fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(4, 6)),
+                                              cb.apply(cb.player, "thorns", k.v(1, 2)))),
+    "crushing_blow": dict(name="Crushing Blow", type="ATTACK", cost=2, targeted=True,
+                          rarity="uncommon",
+                          desc="Deal 14 damage. Apply 2 Weak.",
+                          udesc="Deal 18 damage. Apply 3 Weak.",
+                          fx=lambda cb, k, t: (cb.player_attack(t, k.v(14, 18)),
+                                               cb.apply(t, "weak", k.v(2, 3)))),
+    "unyielding": dict(name="Unyielding", type="POWER", cost=2, rarity="rare",
+                       desc="Gain 3 Metallicize and 2 Dexterity.",
+                       udesc="Gain 4 Metallicize and 3 Dexterity.",
+                       fx=lambda cb, k, t: (cb.apply(cb.player, "metallicize", k.v(3, 4)),
+                                            cb.apply(cb.player, "dexterity", k.v(2, 3)))),
+
+    # ── ashwalker ──
+    "caltrops": dict(name="Caltrops", type="SKILL", cost=1,
+                     desc="Gain 3 Thorns.", udesc="Gain 5 Thorns.",
+                     fx=lambda cb, k, t: cb.apply(cb.player, "thorns", k.v(3, 5))),
+    "vial_toss": dict(name="Vial Toss", type="ATTACK", cost=1, targeted=True,
+                      rarity="uncommon",
+                      desc="Deal 5 damage. Apply 3 Poison.",
+                      udesc="Deal 7 damage. Apply 4 Poison.",
+                      fx=lambda cb, k, t: (cb.player_attack(t, k.v(5, 7)),
+                                           cb.apply(t, "poison", k.v(3, 4)))),
+    "shadowstep": dict(name="Shadowstep", type="SKILL", cost=1, rarity="rare",
+                       exhaust=True,
+                       desc="Draw 3 cards. Gain 2 Energy. Exhaust.",
+                       udesc="Draw 4 cards. Gain 2 Energy. Exhaust.",
+                       fx=lambda cb, k, t: (cb.draw(k.v(3, 4)), cb.gain_energy(2))),
 }

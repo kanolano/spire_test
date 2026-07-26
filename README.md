@@ -18,7 +18,12 @@ Terminal:
 ```sh
 python3 -m spire_of_ash.term
 python3 -m spire_of_ash.term --seed 42  # replay a reproducible run
+python3 -m spire_of_ash.term --daily    # today's shared seed
 ```
+
+Runs are seeded, so a seed is a shareable challenge. The browser client has a
+**Daily climb** toggle on the character-select screen; everyone who plays on the
+same UTC date gets the same Spire.
 
 Requires Python 3.10+. Installing the package (`pip install -e .`) also gives you
 `spire` and `spire-web` commands.
@@ -64,6 +69,24 @@ run.pending        what the run is waiting for right now
 Where a card needs a choice the player has to make (True Grit+ picking a card to
 exhaust), the client sends that choice with the action — `Card.requires` says
 which. The engine never blocks waiting for input.
+
+## Adding content
+
+Everything is a table entry. A relic is one row plus whichever hooks it wants:
+
+```python
+"oathkeeper": dict(
+    name="Oathkeeper", desc="Heal 3 HP whenever an enemy dies.",
+    on_kill=lambda cb, enemy: cb.heal(cb.player, 3)),
+```
+
+Hooks: `on_pickup`, `on_combat_start`, `on_turn_start`, `on_turn_end`,
+`on_combat_end`, `on_attack`, `on_card_played`, `on_exhaust`, `on_kill`,
+`draw_bonus`. Cards carry an `fx(combat, card, target)`; events return their text
+and may ask for a follow-up picker (`remove`, `upgrade`, `duplicate`).
+
+`tests/test_content.py` walks every table, so a card key typo'd into a class pool
+fails the suite instead of crashing a run on a seed you cannot reproduce.
 
 Runs are seeded and serialisable, so they are reproducible, resumable across a
 server restart, and testable.

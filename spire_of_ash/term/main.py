@@ -12,6 +12,7 @@ import sys
 from ..engine.errors import InvalidAction
 from ..engine.records import load_records, save_record
 from ..engine.run import Run
+from ..seeds import daily_label, daily_seed
 from ..web.dto import CLASS_ROSTER, view
 from .render import (BOLD, CYN, GRN, GRY, MAG, RED, WHT, YEL, TITLE, bar, c,
                      clear, pause, print_cards, prompt, render_map, status_line,
@@ -405,10 +406,15 @@ def main(argv=None):
                                      description="Play Spire of Ash in the terminal.")
     parser.add_argument("--seed", type=int, default=None,
                         help="play a reproducible run")
+    parser.add_argument("--daily", action="store_true",
+                        help="play today's shared seed")
     args = parser.parse_args(argv)
+    seed = daily_seed() if args.daily else args.seed
+    if args.daily:
+        print(c(f"\n  Daily climb — {daily_label()}\n", YEL))
     try:
-        while play(args.seed):
-            args.seed = None      # only the first run honours an explicit seed
+        while play(seed):
+            seed = None           # only the first run honours an explicit seed
     except SystemExit:
         pass
     clear()

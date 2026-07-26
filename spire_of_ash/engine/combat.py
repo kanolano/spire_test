@@ -37,6 +37,8 @@ class Combat:
         self.attacks_total = 0
         self.attacked_this_turn = False
         self.bonus_energy_next = 0
+        self.cards_played = 0
+        self.exhausts_this_combat = 0
         # set for the duration of one card's effect when the client pre-declared
         # a choice the effect will consume
         self.pending_exhaust = None
@@ -127,6 +129,8 @@ class Combat:
         enemy.hp = 0
         enemy.alive = False
         self.msg(f"{enemy.name} is slain!")
+        for hook in self._relics("on_kill"):
+            hook(self, enemy)
         od = enemy.spec.get("on_death")
         if od:
             od(self, enemy)
@@ -180,8 +184,11 @@ class Combat:
 
     def exhaust_card(self, card):
         self.exhausted.append(card)
+        self.exhausts_this_combat += 1
         if self.player.s("feelnopain"):
             self.gain_block(self.player, self.player.s("feelnopain"))
+        for hook in self._relics("on_exhaust"):
+            hook(self, card)
 
     def gain_energy(self, n):
         self.energy += n
@@ -241,11 +248,14 @@ class Combat:
     def on_card_played(self):
         """After Image / A Thousand Cuts fire once per card played."""
         p = self.player
+        self.cards_played += 1
         if p.s("afterimage"):
             self.gain_block(p, p.s("afterimage"))
         if p.s("thousandcuts"):
             for e in self.living():
                 self.damage(e, p.s("thousandcuts"))
+        for hook in self._relics("on_card_played"):
+            hook(self)
 
     def armaments(self, all_cards):
         candidates = [k for k in self.hand if k.upgradable and not k.upgraded]
@@ -434,6 +444,8 @@ class Combat:
             "attacks_total": self.attacks_total,
             "attacked_this_turn": self.attacked_this_turn,
             "bonus_energy_next": self.bonus_energy_next,
+            "cards_played": self.cards_played,
+            "exhausts_this_combat": self.exhausts_this_combat,
             "enemies": [e.to_dict() for e in self.enemies],
             "hand": [k.to_dict() for k in self.hand],
             "draw_pile": [k.to_dict() for k in self.draw_pile],
@@ -462,6 +474,8 @@ class Combat:
         cb.attacks_total = d["attacks_total"]
         cb.attacked_this_turn = d["attacked_this_turn"]
         cb.bonus_energy_next = d["bonus_energy_next"]
+        cb.cards_played = d.get("cards_played", 0)
+        cb.exhausts_this_combat = d.get("exhausts_this_combat", 0)
         cb.hand = [Card.from_dict(k) for k in d["hand"]]
         cb.draw_pile = [Card.from_dict(k) for k in d["draw_pile"]]
         cb.discard = [Card.from_dict(k) for k in d["discard"]]

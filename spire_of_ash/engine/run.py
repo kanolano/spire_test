@@ -25,6 +25,7 @@ from .combatant import Player
 from .dungeon import generate_map, make_encounter
 from .errors import Defeat, InvalidAction
 from ..rng import Rng
+from ..seeds import daily_seed
 
 
 class Run:
@@ -33,8 +34,10 @@ class Run:
         self.new_run(cls)
 
     # ── lifecycle ──
-    def new_run(self, cls=None):
+    def new_run(self, cls=None, seed=None):
         """With no class chosen yet the run parks on the select screen."""
+        if seed is not None:
+            self.rng = Rng(seed)
         self.player = Player(cls or DEFAULT_CLASS)
         self.act = 1
         self.floors = generate_map(self.rng)
@@ -143,7 +146,12 @@ class Run:
         cls = action.get("cls")
         if cls is not None and not isinstance(cls, str):
             raise InvalidAction("Class must be a name.")
-        self.new_run(cls if cls in CLASSES else DEFAULT_CLASS)
+        seed = action.get("seed")
+        if action.get("daily"):
+            seed = daily_seed()
+        elif seed is not None and (not isinstance(seed, int) or isinstance(seed, bool)):
+            raise InvalidAction("Seed must be a number.")
+        self.new_run(cls if cls in CLASSES else DEFAULT_CLASS, seed)
 
     # ── map ──
     def _do_map(self, action):
@@ -321,6 +329,8 @@ class Run:
             card = cards[idx]
             if kind == "upgrade":
                 card.upgrade()
+            elif kind == "duplicate":
+                self.player.deck.append(card.copy())
             elif kind == "remove" and card in self.player.deck:
                 self.player.deck.remove(card)
                 price = self.choose["price"]
@@ -422,7 +432,7 @@ class Run:
         ev = EVENTS[idx]
         self.event = {"index": idx, "title": ev["title"], "text": ev["text"],
                       "options": [label for label, _ in ev["options"]],
-                      "result": None, "needs_removal": False}
+                      "result": None, "then": None}
         self.screen = "event"
 
     def _do_event_choose(self, action):
@@ -435,15 +445,26 @@ class Run:
             raise InvalidAction("No such option.")
         result = options[idx][1](self, self.player)
         self.event["result"] = result["text"] or "Nothing happens."
-        self.event["needs_removal"] = result.get("then") == "remove"
+        self.event["then"] = result.get("then")
+
+    # Follow-up card pickers an event can ask for.
+    FOLLOWUPS = {
+        "remove": ("Choose a card to remove", lambda p: list(p.deck)),
+        "duplicate": ("Choose a card to duplicate", lambda p: list(p.deck)),
+        "upgrade": ("Choose a card to upgrade",
+                    lambda p: [k for k in p.deck if k.upgradable and not k.upgraded]),
+    }
 
     def _do_event_done(self, action):
         self._need("event")
-        if self.event["needs_removal"] and self.player.deck:
-            self.open_choose("remove", "Choose a card to remove",
-                             list(self.player.deck), "map")
-        else:
-            self.to_map()
+        followup = self.FOLLOWUPS.get(self.event["then"])
+        if followup:
+            title, pick = followup
+            cards = pick(self.player)
+            if cards:
+                self.open_choose(self.event["then"], title, cards, "map")
+                return
+        self.to_map()
 
     # ── snapshot ──
     def state(self):
@@ -459,6 +480,7 @@ class Run:
             "banner": self.banner,
             "killer": self.killer,
             "pending": self.pending,
+            "seed": self.rng.seed,
             "player": {
                 "name": p.name, "cls": p.cls, "hp": p.hp, "max_hp": p.max_hp,
                 "block": p.block, "gold": p.gold, "deck_size": len(p.deck),

@@ -86,7 +86,8 @@ ACT_POOLS = {
         strong=[["chosen", "chosen"], ["sentry", "sentry", "sentry"],
                 ["mystic", "chosen"], ["byrd", "byrd", "byrd"],
                 ["acid_slime", "acid_slime"], ["chosen", "mystic"]],
-        elite=["book_of_stabbing", "taskmaster"], boss=["champ", "hexaghost"]),
+        elite=["book_of_stabbing", "taskmaster", "ash_warden"],
+        boss=["ashen_sovereign"]),
 }
 
 

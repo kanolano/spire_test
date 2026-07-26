@@ -5,9 +5,8 @@ it. The old handlers printed coloured text straight to stdout, so the web layer
 had to run them under `contextlib.redirect_stdout` — swapping a process-global —
 and then strip ANSI codes back out of the captured string.
 
-A handler returns `outcome(text, then=...)`. `then` names a follow-up screen the
-run must open before the event is finished; only "remove" (card removal) is used
-today.
+A handler returns `outcome(text, then=...)`. `then` names a follow-up card picker
+the run opens before the event finishes — "remove", "upgrade" or "duplicate".
 """
 
 from ..engine.card import Card
@@ -96,6 +95,57 @@ def _ev_hurt_card(run, p):
     return outcome(f"You lose {LIBRARY_HP_COST} HP but learn {CARDS[keys[0]]['name']}.")
 
 
+MIRROR_MAX_HP_COST = 6
+FORGE_PRICE = 60
+CROW_HP_COST = 6
+STAIR_HEAL = 12
+
+
+def _ev_duplicate(run, p):
+    p.max_hp = max(1, p.max_hp - MIRROR_MAX_HP_COST)
+    p.hp = min(p.hp, p.max_hp)
+    return outcome(f"The glass drinks {MIRROR_MAX_HP_COST} Max HP and offers a twin.",
+                   then="duplicate")
+
+
+def _ev_forge(run, p):
+    if p.gold < FORGE_PRICE:
+        return outcome("You cannot cover the smith's price. He turns away.")
+    p.gold -= FORGE_PRICE
+    return outcome(f"You pay {FORGE_PRICE} gold and the smith takes up his hammer.",
+                   then="upgrade")
+
+
+def _ev_crow_gold(run, p):
+    p.hp = max(1, p.hp - CROW_HP_COST)
+    n = run.rng.randint(60, 110)
+    p.gold += n
+    return outcome(f"The beak finds your arm — {CROW_HP_COST} HP — but it leads you "
+                   f"to {n} gold.")
+
+
+def _ev_crow_feed(run, p):
+    if len(p.potions) < p.max_potions:
+        k = run.rng.choice(list(POTIONS))
+        p.potions.append(k)
+        return outcome(f"The crow drops a {POTIONS[k]['name']} at your feet.")
+    p.gold += 40
+    return outcome("Your satchel is full, so the crow leaves 40 gold instead.")
+
+
+def _ev_stair_climb(run, p):
+    healed = min(STAIR_HEAL, p.max_hp - p.hp)
+    p.hp += healed
+    return outcome(f"You pick your way up in silence and catch your breath. +{healed} HP.")
+
+
+def _ev_stair_search(run, p):
+    n = run.rng.randint(40, 75)
+    p.gold += n
+    p.deck.append(Card("slimed"))
+    return outcome(f"You dig out {n} gold, and something wet clings to your pack.")
+
+
 EVENTS = [
     dict(title="THE CLERIC", text="A robed figure offers her services to weary travellers, "
                                   "for a price that is not always gold.",
@@ -124,4 +174,23 @@ EVENTS = [
     dict(title="THE LIBRARY", text="Shelves of half-burnt tomes. One book is still warm, "
                                    "and reading it hurts.",
          options=[("Read the warm book", _ev_hurt_card), ("Take a nap instead", _ev_heal)]),
+    dict(title="THE ASHEN MIRROR", text="A pane of black glass, unbroken in all this ruin. "
+                                        "Your reflection is a half-step behind you, and it "
+                                        "is holding one of your cards.",
+         options=[("Reach through the glass (lose 6 Max HP)", _ev_duplicate),
+                  ("Look away", _ev_nothing)]),
+    dict(title="THE COLD FORGE", text="A smith works a forge that gives no heat. He does not "
+                                      "look up. 'Sixty,' he says, 'and I'll sharpen "
+                                      "something for you.'",
+         options=[("Pay 60 gold", _ev_forge), ("Keep your coin", _ev_nothing)]),
+    dict(title="THE STARVING CROW", text="An enormous crow blocks the stair, head cocked. "
+                                         "It is plainly hungry, and plainly clever.",
+         options=[("Let it take a bite", _ev_crow_gold),
+                  ("Share your rations", _ev_crow_feed),
+                  ("Drive it off", _ev_nothing)]),
+    dict(title="THE COLLAPSED STAIR", text="Half the stairwell has fallen away. There is a "
+                                           "quiet path around it, and a heap of rubble that "
+                                           "glitters where the torchlight catches.",
+         options=[("Take the quiet path", _ev_stair_climb),
+                  ("Search the rubble", _ev_stair_search)]),
 ]

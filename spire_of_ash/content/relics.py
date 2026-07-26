@@ -15,6 +15,9 @@ Hooks (all optional):
     on_turn_end(combat)        — end of the player's turn
     on_combat_end(combat)      — after the last enemy dies
     on_attack(combat, damage)  — return a new damage value, or None to leave it
+    on_card_played(combat)     — after each card resolves
+    on_exhaust(combat, card)   — whenever a card is exhausted
+    on_kill(combat, enemy)     — whenever an enemy dies
     draw_bonus(combat)         — extra cards to draw this turn
 """
 
@@ -79,6 +82,32 @@ def _strawberry(player):
     player.hp += B.STRAWBERRY_MAX_HP
 
 
+def _smoulder_stone(cb):
+    for e in cb.living():
+        cb.damage(e, B.SMOULDER_DAMAGE, ignore_block=True)
+
+
+def _grave_ash(cb, card):
+    if cb.exhausts_this_combat == 1:      # only the first exhaust of the combat
+        cb.apply(cb.player, "strength", B.GRAVE_ASH_STRENGTH)
+        cb.msg("Grave Ash drinks the cinders.")
+
+
+def _bone_dice(cb):
+    if cb.cards_played % B.BONE_DICE_EVERY == 0:
+        cb.draw(1)
+
+
+def _oathkeeper(cb, enemy):
+    cb.heal(cb.player, B.OATHKEEPER_HEAL)
+
+
+def _hollow_lantern(cb):
+    """More cards every turn, but the first turn is a step behind."""
+    if cb.turn == 0:
+        cb.energy = max(0, cb.energy - 1)
+
+
 RELICS = {
     "burning_blood": dict(
         name="Burning Blood", desc="Heal 6 HP after each combat.",
@@ -131,6 +160,34 @@ RELICS = {
         name="Ash Phial", desc="At combat start, apply 2 Poison to ALL enemies.",
         on_combat_start=_combat_start_apply("poison", B.ASH_PHIAL_POISON,
                                             to_enemies=True)),
+
+    # ── added once relics became data; each of these is one entry, where the
+    # old design would have needed edits in two classes and several methods ──
+    "emberheart": dict(
+        name="Emberheart", desc="At combat start, gain 3 Metallicize.",
+        on_combat_start=_combat_start_apply("metallicize", 3)),
+    "ashglass_vial": dict(
+        name="Ashglass Vial", desc="At combat start, apply 1 Weak to ALL enemies.",
+        on_combat_start=_combat_start_apply("weak", 1, to_enemies=True)),
+    "smoulder_stone": dict(
+        name="Smoulder Stone",
+        desc="At the start of each turn, deal 1 damage to ALL enemies.",
+        on_turn_start=_smoulder_stone),
+    "grave_ash": dict(
+        name="Grave Ash",
+        desc="The first card you exhaust each combat grants 2 Strength.",
+        on_exhaust=_grave_ash),
+    "bone_dice": dict(
+        name="Bone Dice", desc="Every 4th card you play, draw 1 card.",
+        on_card_played=_bone_dice),
+    "oathkeeper": dict(
+        name="Oathkeeper", desc="Heal 3 HP whenever an enemy dies.",
+        on_kill=_oathkeeper),
+    "hollow_lantern": dict(
+        name="Hollow Lantern",
+        desc="Draw 1 extra card each turn, but start combat with 1 less Energy.",
+        draw_bonus=lambda cb: 1,
+        on_turn_start=_hollow_lantern),
 }
 
 # Starting relics are handed out by class and never appear as drops.
