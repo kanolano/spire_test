@@ -36,7 +36,11 @@ def cards_data(cards, energy=None):
 
 
 def sorted_cards(cards):
-    return sorted((card_data(k) for k in cards), key=lambda d: (d["type"], d["name"]))
+    """The deck view. Carries upgrade previews so 'what does + do to this?' is
+    answerable from the deck screen, not only at the moment you commit to it."""
+    out = sorted((dict(card_data(k), up=upgrade_preview(k)) for k in cards),
+                 key=lambda d: (d["type"], d["name"]))
+    return out
 
 
 def upgrade_preview(card):

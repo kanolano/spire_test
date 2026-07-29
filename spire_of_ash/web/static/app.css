@@ -280,6 +280,9 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .upto{width:var(--card-w);padding:8px 10px;border:1px solid var(--gold2);
   border-radius:var(--r);background:#211a2c;cursor:pointer;transition:.12s}
 .upto:hover{background:#2b2237;border-color:var(--gold)}
+/* the deck view shows the same block, but there is nothing to click */
+.upto.static{cursor:default;border-color:var(--line2)}
+.upto.static:hover{background:#211a2c;border-color:var(--line2)}
 .upto .upname{font-family:var(--display);font-size:13px;color:var(--gold);
   display:flex;justify-content:space-between;align-items:baseline;gap:6px}
 .upto .upcost{font-size:11px;color:var(--leaf);font-family:var(--ui)}

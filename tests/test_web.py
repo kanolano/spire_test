@@ -368,6 +368,21 @@ class TestDto(unittest.TestCase):
         self.assertEqual(strike["up"]["name"], "Strike+")
         self.assertEqual(strike["up"]["desc"], "Deal 9 damage.")
 
+    def test_the_deck_view_answers_it_too(self):
+        """The picker is two clicks deep inside a campfire; the deck is one key."""
+        run = Run("sentinel", seed=5)
+        deck = view(run)["deck"]
+        self.assertTrue(all(c["up"] for c in deck), "every starter is upgradable")
+        bash = next(c for c in deck if c["key"] == "bash")
+        self.assertEqual(bash["up"]["desc"], "Deal 10 damage. Apply 3 Vulnerable.")
+
+    def test_an_already_upgraded_card_has_nothing_to_preview(self):
+        run = Run("sentinel", seed=5)
+        run.player.deck[0].upgrade()
+        upgraded = [c for c in view(run)["deck"] if c["upgraded"]]
+        self.assertTrue(upgraded)
+        self.assertTrue(all(c["up"] is None for c in upgraded))
+
     def test_previewing_an_upgrade_does_not_apply_it(self):
         run = Run("sentinel", seed=5)
         run.screen = "rest"

@@ -487,6 +487,23 @@ function clickFoe(i){
   send({type:"play", idx:sel.idx, target:i, exhaust:null});
 }
 
+/* A card stacked with what it becomes when upgraded. Used by the upgrade
+   picker and by the deck overlay, so the answer to "what does + do to this?"
+   is reachable at any time rather than only at the moment you commit. */
+function withUpgrade(card, c, onclick){
+  const stack = el("div","upstack");
+  stack.appendChild(card);
+  const to = el("div","upto",
+    `<div class="upname">${esc(c.up.name)}` +
+    (c.up.cost !== c.cost
+      ? `<span class="upcost">${c.cost} → ${c.up.cost}</span>` : "") +
+    `</div><div class="updesc">${esc(c.up.desc)}</div>`);
+  if(onclick) to.onclick = onclick;
+  else to.classList.add("static");
+  stack.appendChild(to);
+  return stack;
+}
+
 /* ── other screens ──────────────────────────────────────── */
 /* Rewards used to be granted the instant the last enemy died and reported as
    one run-on sentence. Each one is now a row you take or leave, and the screen
@@ -557,18 +574,8 @@ function renderChoose(st){
   ch.cards.forEach((c,i) => {
     const card = cardEl(c,{pick:true, kbd:i<9?i+1:null,
                            onclick:()=>send({type:"choose", idx:i})});
-    if(!c.up){ row.appendChild(card); return; }
-    // the upgraded form, so picking is not a memory test
-    const stack = el("div","upstack");
-    stack.appendChild(card);
-    const to = el("div","upto",
-      `<div class="upname">${esc(c.up.name)}` +
-      (c.up.cost !== c.cost
-        ? `<span class="upcost">${c.cost} → ${c.up.cost}</span>` : "") +
-      `</div><div class="updesc">${esc(c.up.desc)}</div>`);
-    to.onclick = ()=> send({type:"choose", idx:i});
-    stack.appendChild(to);
-    row.appendChild(stack);
+    if(ch.kind !== "upgrade" || !c.up){ row.appendChild(card); return; }
+    row.appendChild(withUpgrade(card, c, ()=>send({type:"choose", idx:i})));
   });
   st.appendChild(row);
   if(ch.kind === "remove"){
@@ -726,13 +733,16 @@ function renderEnd(st, won){
 let overlayReturn = null;              // focus goes back where it came from
 let overlayConfirm = null;             // set while the overlay is asking a yes/no
 
-function openOverlay(title, cards, note){
+function openOverlay(title, cards, note, upgrades){
   const b = $("#overlay-body"); b.innerHTML = "";
   b.appendChild(el("h2","title",esc(title)));
   $("#overlay-title").textContent = title;
   if(note) b.appendChild(el("div","sub",esc(note)));
   const row = el("div","row");
-  (cards||[]).forEach(c => row.appendChild(cardEl(c,{static:true})));
+  (cards||[]).forEach(c => {
+    const card = cardEl(c,{static:true});
+    row.appendChild(upgrades && c.up ? withUpgrade(card, c, null) : card);
+  });
   b.appendChild(row);
   showOverlay();
 }
@@ -744,8 +754,12 @@ function showOverlay(){
 }
 function overlayOpen(){ return $("#overlay").classList.contains("on"); }
 function showDeck(){
+  const upgradable = S.deck.filter(c => c.up).length;
   openOverlay(`Your deck — ${S.deck.length} cards`, S.deck,
-    "Relics: " + S.player.relics.map(r=>r.name).join(", "));
+    (upgradable ? `${upgradable} can still be upgraded — each is shown with what `
+                + "it becomes. " : "") +
+    "Relics: " + S.player.relics.map(r=>r.name).join(", "),
+    true);
 }
 function showRelics(){
   const b = $("#overlay-body"); b.innerHTML = "";
