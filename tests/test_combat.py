@@ -258,3 +258,65 @@ class TestLog(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEnemyTurnGuards(unittest.TestCase):
+    """An enemy that dies partway through the enemy phase must stop acting.
+
+    A multi-hit attacker killed by Thorns used to finish every remaining hit
+    after it was dead, so the player took damage from an enemy the screen was
+    already drawing as slain.
+    """
+
+    def test_a_dead_enemy_stops_mid_attack(self):
+        cb = make_combat(("guardian",))
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.intent = "Whirlwind"            # 5 damage, four hits
+        cb.player.st["thorns"] = 9999       # the first hit kills it
+        cb.player.block = 0
+        before = cb.player.hp
+        cb.enemy_turns()
+        self.assertFalse(foe.alive)
+        self.assertEqual(before - cb.player.hp, 5, "only the first hit lands")
+
+    def test_a_dead_enemy_does_not_fire_its_move_effect(self):
+        cb = make_combat(("guardian",))
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.intent = "Twin Slam"            # 8 x2, and grants itself Strength
+        cb.player.st["thorns"] = 9999
+        cb.enemy_turns()
+        self.assertFalse(foe.alive)
+        self.assertEqual(foe.s("strength"), 0, "a corpse does not buff itself")
+
+    def test_an_enemy_killed_by_another_does_not_take_its_turn(self):
+        cb = make_combat(("cultist", "cultist"))
+        cb.start_combat()
+        first, second = cb.enemies
+        for e in cb.enemies:
+            e.intent = "Dark Strike" if "Dark Strike" in e.moves else list(e.moves)[0]
+        # the first one's turn kills the second outright
+        cb.kill(second)
+        before = cb.player.hp
+        cb.enemy_turns()
+        self.assertLessEqual(cb.player.hp, before)
+        self.assertFalse(second.alive)
+
+
+class TestUnattributedDamage(unittest.TestCase):
+    """HP that vanishes at end of turn needs a line in the log to explain it."""
+
+    def test_burn_says_so(self):
+        cb = make_combat()
+        cb.start_combat()
+        cb.hand = [Card("burn")]
+        cb.player_turn_end()
+        self.assertTrue(any("Burn" in line for line in cb.log), cb.log)
+
+    def test_regret_says_so(self):
+        cb = make_combat()
+        cb.start_combat()
+        cb.hand = [Card("regret"), Card("strike")]
+        cb.player_turn_end()
+        self.assertTrue(any("Regret" in line for line in cb.log), cb.log)

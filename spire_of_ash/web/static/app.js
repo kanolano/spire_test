@@ -549,9 +549,26 @@ function renderReward(st){
 function renderChoose(st){
   const ch = S.choose;
   st.appendChild(el("h2","title",esc(ch.title)));
+  if(ch.kind === "upgrade"){
+    st.appendChild(el("div","sub","Each card is shown with what it becomes."));
+  }
   const row = el("div","row"); row.style.marginTop="14px";
-  ch.cards.forEach((c,i) => row.appendChild(cardEl(c,{pick:true,
-    kbd:i<9?i+1:null, onclick:()=>send({type:"choose", idx:i})})));
+  ch.cards.forEach((c,i) => {
+    const card = cardEl(c,{pick:true, kbd:i<9?i+1:null,
+                           onclick:()=>send({type:"choose", idx:i})});
+    if(!c.up){ row.appendChild(card); return; }
+    // the upgraded form, so picking is not a memory test
+    const stack = el("div","upstack");
+    stack.appendChild(card);
+    const to = el("div","upto",
+      `<div class="upname">${esc(c.up.name)}` +
+      (c.up.cost !== c.cost
+        ? `<span class="upcost">${c.cost} → ${c.up.cost}</span>` : "") +
+      `</div><div class="updesc">${esc(c.up.desc)}</div>`);
+    to.onclick = ()=> send({type:"choose", idx:i});
+    stack.appendChild(to);
+    row.appendChild(stack);
+  });
   st.appendChild(row);
   if(ch.kind === "remove"){
     st.appendChild(ctaButton("Change my mind <kbd>Esc</kbd>",

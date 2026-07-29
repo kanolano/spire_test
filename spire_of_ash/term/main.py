@@ -245,6 +245,13 @@ def screen_choose(run, st):
     ch = st["choose"]
     print(c(f"\n  {ch['title']}\n", BOLD, YEL))
     print_cards(ch["cards"])
+    # picking an upgrade blind meant knowing every upgraded form by heart
+    for i, card in enumerate(ch["cards"], 1):
+        up = card.get("up")
+        if up:
+            cost = (f" (cost {card['cost']} → {up['cost']})"
+                    if up["cost"] != card["cost"] else "")
+            print(c(f"   {i}. becomes {up['name']}{cost} — {up['desc']}", GRY))
     tail = " / (s)kip" if ch["allow_skip"] else ""
     ans = prompt(c(f"\n  card #{tail} > ", YEL)).lower()
     if ans.isdigit() and 1 <= int(ans) <= len(ch["cards"]):

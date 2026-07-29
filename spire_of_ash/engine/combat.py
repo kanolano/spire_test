@@ -331,9 +331,15 @@ class Combat:
         if p.s("flexloss"):
             self.apply(p, "strength", -p.s("flexloss"))
             p.st["flexloss"] = 0
-        for _ in [k for k in self.hand if k.key == "burn"]:
+        # These two say nothing to the player on their own: the HP simply went
+        # away at end of turn, with no attack anywhere on screen to blame.
+        burns = [k for k in self.hand if k.key == "burn"]
+        if burns:
+            self.msg(f"Burn sears you for {2 * len(burns)}.")
+        for _ in burns:
             self.lose_hp(p, 2)
         if any(k.key == "regret" for k in self.hand):
+            self.msg(f"Regret costs you {len(self.hand)} HP.")
             self.lose_hp(p, len(self.hand))
         for hook in self._relics("on_turn_end"):
             hook(self)
@@ -344,7 +350,13 @@ class Combat:
                 p.st[key] -= 1
 
     def enemy_turns(self):
+        # living() is a snapshot: an enemy can die partway through this loop —
+        # to Thorns, to another enemy's move, to its own poison tick — and must
+        # not go on acting. It used to finish every hit of a multi-hit attack
+        # after it was already dead, which read as damage from nowhere.
         for e in self.living():
+            if not e.alive:
+                continue
             if e.s("poison"):
                 self.lose_hp(e, e.s("poison"))
                 e.st["poison"] -= 1
@@ -356,9 +368,13 @@ class Combat:
             m = e.moves[e.intent]
             if m["kind"] == "attack":
                 for _ in range(m["hits"]):
+                    if not e.alive:
+                        break
                     self.enemy_attack(e, m["dmg"])
-            if m["fn"]:
+            if m["fn"] and e.alive:
                 m["fn"](self, e)
+            if not e.alive:
+                continue
             self.msg(f"{e.name} uses {e.intent}.")
             e.history.append(e.intent)
             e.turn += 1

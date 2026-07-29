@@ -357,6 +357,29 @@ class TestDto(unittest.TestCase):
         run.apply({"type": "reward", "what": "relic"})
         self.assertTrue(view(run)["reward"]["relic_taken"])
 
+    def test_the_upgrade_picker_ships_what_each_card_becomes(self):
+        run = Run("sentinel", seed=5)
+        run.screen = "rest"
+        run.apply({"type": "smith"})
+        cards = view(run)["choose"]["cards"]
+        self.assertTrue(cards)
+        strike = next(c for c in cards if c["key"] == "strike")
+        self.assertEqual(strike["desc"], "Deal 6 damage.")
+        self.assertEqual(strike["up"]["name"], "Strike+")
+        self.assertEqual(strike["up"]["desc"], "Deal 9 damage.")
+
+    def test_previewing_an_upgrade_does_not_apply_it(self):
+        run = Run("sentinel", seed=5)
+        run.screen = "rest"
+        run.apply({"type": "smith"})
+        view(run)
+        self.assertFalse(any(k.upgraded for k in run.player.deck))
+
+    def test_other_pickers_carry_no_upgrade_preview(self):
+        run = Run("sentinel", seed=5)
+        run.open_choose("remove", "Remove", list(run.player.deck), "map")
+        self.assertNotIn("up", view(run)["choose"]["cards"][0])
+
     def test_class_roster_only_ships_on_the_select_screen(self):
         picked = Run("sentinel", seed=1)
         self.assertNotIn("classes", view(picked))

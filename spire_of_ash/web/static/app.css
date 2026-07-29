@@ -275,6 +275,16 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .item .buy:hover:not(:disabled){background:var(--gold);color:#151020}
 .item .buy:disabled{opacity:.3;cursor:not-allowed}
 
+/* ── upgrade picker: the card, and what it becomes ──────── */
+.upstack{display:flex;flex-direction:column;align-items:center;gap:8px}
+.upto{width:var(--card-w);padding:8px 10px;border:1px solid var(--gold2);
+  border-radius:var(--r);background:#211a2c;cursor:pointer;transition:.12s}
+.upto:hover{background:#2b2237;border-color:var(--gold)}
+.upto .upname{font-family:var(--display);font-size:13px;color:var(--gold);
+  display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.upto .upcost{font-size:11px;color:var(--leaf);font-family:var(--ui)}
+.upto .updesc{margin-top:5px;font-size:11.5px;line-height:1.45;color:#cbc4da}
+
 /* what an event choice actually costs, under its flavour label */
 .choice .preview{display:block;margin:5px 0 0 30px;font-size:12.5px;color:var(--dim);
   line-height:1.5}
