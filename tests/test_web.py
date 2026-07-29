@@ -187,6 +187,17 @@ class TestSessions(WebTestCase):
         status, body, _ = c.request("/abandon", {})
         self.assertEqual(status, 200)
         self.assertEqual(body["floor"], 0)
+        # the Quit button's whole point: land back on character select
+        self.assertEqual(body["screen"], "select")
+        self.assertIn("classes", body)
+
+    def test_climbing_again_can_keep_the_class(self):
+        """"Climb again" used to send new_run with no class, silently
+        restarting whoever DEFAULT_CLASS is rather than who you played."""
+        c = self.client()
+        c.request("/action", {"type": "new_run", "cls": "ashwalker"})
+        _, body, _ = c.request("/action", {"type": "new_run", "cls": "ashwalker"})
+        self.assertEqual(body["player"]["cls"], "ashwalker")
 
     def test_store_evicts_over_the_cap(self):
         store = SessionStore(directory=None, max_sessions=3)

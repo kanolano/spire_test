@@ -87,6 +87,7 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .tbtn{padding:5px 12px;border:1px solid var(--line2);border-radius:var(--r);color:var(--dim);
   font-size:13px;background:#221c30;transition:.12s}
 .tbtn:hover{color:var(--gold);border-color:var(--gold2);background:#2b2440}
+.tbtn.danger:hover{color:#e58b7c;border-color:#7d3b47;background:#2a1620}
 
 /* ── layout & headings ───────────────────────────────────── */
 #stage{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;width:100%;max-width:1180px;

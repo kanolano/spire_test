@@ -130,6 +130,55 @@ async function api(path, options){
   return body;
 }
 
+/* Throwing a run away had a server route and no way at all to reach it, so
+   changing class meant dying first — and even then "Climb again" silently
+   restarted the class you had just finished with. */
+async function abandon(){
+  if(busy || offline) return;
+  setBusy(true);
+  try{
+    const next = await api("/abandon", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:"{}"
+    });
+    prev = null; S = next; sel = null; pendingFx = false;
+    lastScreen = null; lastTurn = -1;
+    setOffline(false);
+    render();
+  }catch(e){
+    if(e.status) toast(e.message);
+    else setOffline(true, "Lost contact with the Spire.");
+  }finally{
+    setBusy(false);
+  }
+}
+
+function confirmQuit(){
+  if(!S || S.screen === "select") return;
+  const ending = S.screen === "gameover" || S.screen === "win";
+  $("#overlay-title").textContent = "Abandon this climb";
+  const body = $("#overlay-body");
+  body.innerHTML = "";
+  body.appendChild(el("h2","title", ending ? "Choose another class"
+                                           : "Abandon this climb?"));
+  body.appendChild(el("div","sub", ending
+    ? "You will go back to the character select."
+    : `You are on floor ${S.floor} of act ${S.act}. The run ends here, is not `+
+      `recorded, and you go back to the character select.`));
+  const box = el("div","choices");
+  const yes = el("button","choice",
+    `<span class="k">1</span> <b>${ending ? "Pick a class" : "Abandon the run"}</b>`);
+  yes.onclick = ()=>{ closeOverlay(); abandon(); };
+  const no = el("button","choice",
+    `<span class="k">esc</span> <b>${ending ? "Stay here" : "Keep climbing"}</b>`);
+  no.onclick = closeOverlay;
+  box.appendChild(yes); box.appendChild(no);
+  body.appendChild(box);
+  overlayConfirm = abandon;
+  showOverlay();
+}
+
 async function send(action){
   if(busy || offline) return;
   setBusy(true);
@@ -637,9 +686,13 @@ function renderEnd(st, won){
   relics.style.cssText = "justify-content:center;margin:18px 0";
   relics.innerHTML = S.player.relics.map(r=>`<span class="chip relic">${esc(r.name)}</span>`).join("");
   st.appendChild(relics);
-  const again = ctaButton("Climb again <kbd>Enter</kbd>", ()=> send({type:"new_run"}));
+  // This used to be one button sending new_run with no class, which quietly
+  // restarted whatever DEFAULT_CLASS happens to be rather than what you played.
+  const again = ctaButton(`Climb again as ${esc(S.player.name)} <kbd>Enter</kbd>`,
+                          ()=> send({type:"new_run", cls:S.player.cls}));
   again.style.cssText += ";padding:12px 28px;font-size:16px";
   st.appendChild(again);
+  st.appendChild(ctaButton("Choose another class <kbd>C</kbd>", abandon));
   api("/records").then(recs=>{
     if(!recs || !recs.length) return;
     const d = el("div","center ghost");
@@ -653,6 +706,7 @@ function renderEnd(st, won){
 
 /* ── overlays ───────────────────────────────────────────── */
 let overlayReturn = null;              // focus goes back where it came from
+let overlayConfirm = null;             // set while the overlay is asking a yes/no
 
 function openOverlay(title, cards, note){
   const b = $("#overlay-body"); b.innerHTML = "";
@@ -724,6 +778,7 @@ function closeOverlay(){
   $("#overlay").classList.remove("on");
   if(overlayReturn && overlayReturn.focus) overlayReturn.focus();
   overlayReturn = null;
+  overlayConfirm = null;
 }
 
 /* ── floating damage numbers ────────────────────────────── */
@@ -841,13 +896,15 @@ const SCREENS = {
   },
   gameover: {
     render: st => renderEnd(st, false),
-    hint: "enter to climb again",
-    keys: k => { if(k === "enter") send({type:"new_run"}); },
+    hint: "enter to climb again · c to change class",
+    keys: k => { if(k === "enter") send({type:"new_run", cls:S.player.cls});
+                 if(k === "c") abandon(); },
   },
   win: {
     render: st => renderEnd(st, true),
-    hint: "enter to climb again",
-    keys: k => { if(k === "enter") send({type:"new_run"}); },
+    hint: "enter to climb again · c to change class",
+    keys: k => { if(k === "enter") send({type:"new_run", cls:S.player.cls});
+                 if(k === "c") abandon(); },
   },
 };
 
@@ -913,6 +970,14 @@ document.addEventListener("keydown", ev => {
   if(ev.metaKey || ev.ctrlKey || ev.altKey) return;
   const k = ev.key.toLowerCase();
   if(overlayOpen()){
+    // "1" confirms; Enter deliberately does not, so a stray keypress on the
+    // continue-flavoured key cannot throw a run away.
+    if(overlayConfirm && k === "1"){
+      const go = overlayConfirm;
+      closeOverlay();
+      go();
+      return;
+    }
     if(k === "escape" || k === "i" || k === "?") closeOverlay();
     return;
   }
@@ -941,6 +1006,7 @@ document.addEventListener("click", ev => {
     case "deck":          if(S && S.screen !== "select") showDeck(); break;
     case "help":          showHelp(); break;
     case "close-overlay": closeOverlay(); break;
+    case "quit":          confirmQuit(); break;
     case "relic":         showRelics(); break;
     case "potion":        clickPotion(i); break;
     case "pile":          showPile(target.dataset.pile,
