@@ -256,15 +256,22 @@ def screen_rest(run, st):
     clear()
     header(st)
     p = st["player"]
-    heal = max(1, int(p["max_hp"] * 0.3))
+    full = p["hp"] >= p["max_hp"]
+    heal = min(p["max_hp"] - p["hp"], max(1, int(p["max_hp"] * 0.3)))
     print(c("\n  A CAMPFIRE\n", BOLD, YEL))
-    print(f"  1. Rest — heal {heal} HP")
+    if full:
+        print(c(f"  1. Rest — you are already at {p['hp']}/{p['max_hp']}", GRY))
+    else:
+        print(f"  1. Rest — heal {heal} HP")
     print("  2. Smith — upgrade a card")
+    print("  3. Purge — remove a card from your deck")
     ans = prompt(c("\n  > ", YEL))
-    if ans == "1":
+    if ans == "1" and not full:
         return {"type": "rest"}
     if ans == "2":
         return {"type": "smith"}
+    if ans == "3":
+        return {"type": "purge"}
     return None
 
 

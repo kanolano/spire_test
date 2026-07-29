@@ -40,7 +40,7 @@ No dependencies needed. `pytest` works too if you have it.
 
 Pick a class, climb a 15-floor map per act, and fight your way to the act boss.
 Combat is turn-based: spend energy to play cards from your hand, block what the
-enemy telegraphs, and end your turn. Campfires heal or upgrade, shops sell cards,
+enemy telegraphs, and end your turn. Campfires heal, upgrade or purge, shops sell cards,
 relics and card removal, and `?` in-game lists every key binding.
 
 The browser UI is fully keyboard-driven — number keys play cards, `a`–`d` pick

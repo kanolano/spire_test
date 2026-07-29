@@ -164,7 +164,9 @@ MONSTERS = {
     }, pick=weighted_pick([("Scouring Wave", 35, 2), ("Whip", 40, 2), ("Rally", 25, 1)])),
 
     # ── bosses ──
-    "guardian": dict(name="The Guardian", hp=(240, 240), boss=True, moves={
+    # 240 HP against a floor-15 act-1 deck was ~13 turns of chip damage while
+    # being hit for 32; almost nobody got through it.
+    "guardian": dict(name="The Guardian", hp=(180, 180), boss=True, moves={
         "Charging Up": mv("block", fn=_block(9)),
         "Fierce Bash": mv("attack", 32),
         "Vent Steam": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "vulnerable", 2),
@@ -183,7 +185,7 @@ MONSTERS = {
         "Divider" if e.turn == 1 else
         ["Sear", "Tackle", "Sear", "Inferno", "Tackle", "Sear"][(e.turn - 2) % 6])),
 
-    "slime_boss": dict(name="Slime Boss", hp=(160, 160), boss=True, moves={
+    "slime_boss": dict(name="Slime Boss", hp=(140, 140), boss=True, moves={
         "Goop Spray": mv("debuff", fn=_add_cards("slimed", 3)),
         "Preparing": mv("block", fn=_block(15)),
         "Slam": mv("attack", 38),

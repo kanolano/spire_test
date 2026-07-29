@@ -68,7 +68,13 @@ def _art_of_war(cb):
 
 
 def _burning_blood(cb):
-    cb.heal(cb.player, B.BURNING_BLOOD_HEAL)
+    # A flat 6 after *every* fight out-healed a whole trash encounter, so half
+    # of all combats left the player better off than they started. Dropping it
+    # entirely went too far the other way: this is the Sentinel's only starter
+    # effect, and without it the class bled out in Act 1. Small always, real
+    # after the fights that actually cost something.
+    cb.heal(cb.player, B.BURNING_BLOOD_ELITE_HEAL
+            if cb.kind in ("elite", "boss") else B.BURNING_BLOOD_HEAL)
 
 
 def _meat_on_bone(cb):
@@ -110,7 +116,7 @@ def _hollow_lantern(cb):
 
 RELICS = {
     "burning_blood": dict(
-        name="Burning Blood", desc="Heal 6 HP after each combat.",
+        name="Burning Blood", desc="Heal 3 HP after a combat, 10 after an elite or boss.",
         on_combat_end=_burning_blood),
     "bag_of_marbles": dict(
         name="Bag of Marbles", desc="At combat start, apply 1 Vulnerable to ALL enemies.",

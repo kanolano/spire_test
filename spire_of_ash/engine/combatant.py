@@ -100,8 +100,11 @@ class Enemy(Combatant):
             return {"kind": "attack",
                     "damage": damage_after_modifiers(self, m["dmg"], player),
                     "hits": m["hits"],
-                    "extra": bool(m["fn"])}
-        return {"kind": kind}
+                    "extra": bool(m["fn"]),
+                    "note": m["note"]}
+        # A non-attack intent used to be just its kind, so the client could only
+        # render "▲ buff" and the player had no idea what was coming.
+        return {"kind": kind, "note": m["note"]}
 
     # ── persistence ──
     def to_dict(self):

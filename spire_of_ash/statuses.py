@@ -58,8 +58,6 @@ STATUSES = {
                      "card."),
     "envenom": ("Envm", "Envenom",
                 "Unblocked attack damage applies this much Poison."),
-    "asleep": ("Asleep", "Asleep",
-               "Dormant. It will not act until something rouses it."),
     "flexloss": ("", "", ""),   # internal bookkeeping, never shown
 }
 
@@ -67,7 +65,6 @@ STATUS_LABELS = {key: label for key, (label, _, _) in STATUSES.items()}
 
 # statuses that tick down at the end of the owner's turn
 DECAYING = ("vulnerable", "weak", "frail")
-DEBUFFS = ("vulnerable", "weak", "frail", "poison")
 
 
 def describe(key):

@@ -94,12 +94,23 @@ class TestRelicHooks(unittest.TestCase):
             cb.player_attack(foe, 1)
         self.assertEqual(cb.player.s("dexterity"), 1)
 
-    def test_burning_blood_heals_after_combat(self):
+    def test_burning_blood_heals_after_an_elite_or_boss(self):
+        for kind in ("elite", "boss"):
+            cb = make_combat(kind=kind)
+            cb.player.relics = ["burning_blood"]
+            cb.player.hp = cb.player.max_hp - 20
+            before = cb.player.hp
+            cb.end_combat()
+            self.assertEqual(cb.player.hp, before + B.BURNING_BLOOD_ELITE_HEAL, kind)
+
+    def test_burning_blood_heals_less_after_trash(self):
+        """A flat 6 after every fight made a trash node cost nothing at all."""
         cb = self.relic_combat("burning_blood")
         cb.player.hp = cb.player.max_hp - 20
         before = cb.player.hp
         cb.end_combat()
         self.assertEqual(cb.player.hp, before + B.BURNING_BLOOD_HEAL)
+        self.assertLess(B.BURNING_BLOOD_HEAL, B.BURNING_BLOOD_ELITE_HEAL)
 
     def test_meat_on_bone_only_heals_below_half(self):
         cb = self.relic_combat("meat_on_bone")

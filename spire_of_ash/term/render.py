@@ -21,7 +21,7 @@ STATUS_COLOR = {
     "frail": BLU, "poison": GRN, "thorns": YEL, "ritual": RED,
     "metallicize": CYN, "demonform": RED, "barricade": CYN, "feelnopain": CYN,
     "rupture": RED, "juggernaut": YEL, "venombloom": GRN, "afterimage": CYN,
-    "thousandcuts": RED, "envenom": GRN, "asleep": GRY,
+    "thousandcuts": RED, "envenom": GRN,
 }
 NODE_SYMBOLS = {
     "monster": ("M", RED), "elite": ("E", MAG), "event": ("?", CYN),

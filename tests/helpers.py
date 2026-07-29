@@ -16,11 +16,11 @@ from spire_of_ash.engine.errors import InvalidAction     # noqa: E402
 from spire_of_ash.rng import Rng                         # noqa: E402
 
 
-def make_combat(enemies=("cultist",), cls="sentinel", seed=1234):
+def make_combat(enemies=("cultist",), cls="sentinel", seed=1234, kind="monster"):
     """A started combat plus its rng, for rules tests."""
     rng = Rng(seed)
     player = Player(cls)
-    cb = Combat(player, [Enemy(k, 1, rng) for k in enemies], rng, "TEST")
+    cb = Combat(player, [Enemy(k, 1, rng) for k in enemies], rng, "TEST", kind)
     cb.start_combat()
     return cb
 

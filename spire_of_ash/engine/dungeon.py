@@ -21,7 +21,7 @@ def generate_map(rng, floors_per_act=B.FLOORS_PER_ACT):
             types = ["monster"] * rng.randint(2, 3)
         elif f == B.TREASURE_FLOOR:
             types = ["treasure"] * rng.randint(2, 4)
-        elif f == last - 1:
+        elif f in (last - 1, B.MID_REST_FLOOR):
             types = ["rest"] * rng.randint(2, 3)
         else:
             types = [_roll_node(rng, f) for _ in range(rng.randint(2, 4))]
@@ -51,11 +51,14 @@ def _link(rng, cur, nxt):
     base = [round(j * (m - 1) / (n - 1)) if n > 1 else (m - 1) // 2 for j in range(n)]
     for j, node in enumerate(cur):
         targets = {base[j]}
-        hi = base[j + 1] if j + 1 < n else m - 1
-        lo = base[j - 1] if j > 0 else 0
-        if rng.random() < 0.5 and base[j] + 1 <= hi:
+        # A branch used to be clamped to the neighbouring columns' own base, to
+        # stop edges crossing. Wherever a floor narrowed, that collapsed several
+        # columns onto the same base and forced a single exit — the single
+        # biggest source of choiceless steps. Branches are now bounded only by
+        # the floor itself; edges may cross, which the map draws legibly.
+        if rng.random() < B.MAP_BRANCH_UP:
             targets.add(base[j] + 1)
-        if rng.random() < 0.35 and base[j] - 1 >= lo:
+        if rng.random() < B.MAP_BRANCH_DOWN:
             targets.add(base[j] - 1)
         node["edges"] = sorted(t for t in targets if 0 <= t < m)
     covered = {t for node in cur for t in node["edges"]}

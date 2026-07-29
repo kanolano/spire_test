@@ -4,6 +4,7 @@ let lastScreen = null, lastTurn = -1;   // so animations only fire on real chang
 let pendingFx = false;                  // a fresh state to animate, not a re-render
 let offline = false;
 let dailyMode = false;                  // share today's seed with everyone else
+let SHOP_KEYS = {};                     // letter -> action, rebuilt by renderShop
 
 const SPRITE = {
   "Jaw Worm":"🪱","Cultist":"🧙","Red Louse":"🐜","Fungi Beast":"🍄","Acid Slime":"🟢",
@@ -34,6 +35,8 @@ const NODE = {
 };
 const LETTERS = "abcdefgh";
 const POTION_KEYS = "qwrtyu";          // was hardcoded as "qwr" in three places
+// The shop needs its own letters: POTION_KEYS[2] is "r", which the relic wants.
+const SHOP_POTION_KEYS = "qwe";
 // Anything carrying these two attributes gets the hover/focus/tap tooltip.
 const tipAttrs = (name, desc) =>
   ` data-tip="${esc(name)}" data-tip-desc="${esc(desc || "")}"`;
@@ -325,13 +328,19 @@ function renderCombat(st){
     const d = el("div","foe"+(e.alive?"":" dead")+(sel&&sel.mode==="target"&&e.alive?" targetable":""));
     d.dataset.foe = i;
     const it = e.intent;
+    // Non-attack intents used to read "▲ buff". The move's own name says far
+    // more, and the tooltip carries the kind and whatever note it has.
+    const GLYPH = {attack:"⚔", block:"🛡", buff:"▲", debuff:"▼"};
+    const KIND_TIP = {attack:"It will attack.", block:"It is defending.",
+                      buff:"It is strengthening itself.",
+                      debuff:"It will weaken you."};
     const badge = !it ? "" :
-      it.kind==="attack"
-        ? `<div class="intent attack" title="${esc(it.name)}">⚔ ${it.dmg}`+
-          `${it.hits>1?` × ${it.hits}`:""}${it.extra?" +":""}</div>`
-      : it.kind==="block" ? `<div class="intent block" title="${esc(it.name)}">🛡 defend</div>`
-      : it.kind==="buff"  ? `<div class="intent buff" title="${esc(it.name)}">▲ buff</div>`
-      : `<div class="intent debuff" title="${esc(it.name)}">▼ debuff</div>`;
+      `<div class="intent ${it.kind}"` +
+      tipAttrs(it.name, it.note || KIND_TIP[it.kind] || "") + `>` +
+      (it.kind==="attack"
+        ? `${GLYPH.attack} ${it.dmg}${it.hits>1?` × ${it.hits}`:""}${it.extra?" +":""}`
+        : `${GLYPH[it.kind]||"●"} ${esc(it.name)}`) +
+      `</div>`;
     d.innerHTML =
       (e.alive?badge:"<div class='intent'>slain</div>") +
       `<div class="sprite">${SPRITE[e.name]||"👾"}</div><div class="shadow"></div>` +
@@ -502,16 +511,26 @@ function renderChoose(st){
 }
 
 function renderRest(st){
+  const p = S.player, full = p.hp >= p.max_hp;
   st.appendChild(el("h2","title","A campfire"));
   st.appendChild(el("div","sub","The embers are warm. You have time for one thing."));
-  const heal = Math.max(1, Math.floor(S.player.max_hp*0.3));
+  const heal = Math.min(p.max_hp - p.hp, Math.max(1, Math.floor(p.max_hp*0.3)));
   const box = el("div","choices");
-  const a = el("button","choice",`<span class="k">1</span> <b>Rest</b> — heal ${heal} HP `+
-    `<span class="ghost">(you are at ${S.player.hp}/${S.player.max_hp})</span>`);
-  a.onclick = ()=> send({type:"rest"});
-  const b = el("button","choice",`<span class="k">2</span> <b>Smith</b> — upgrade a card`);
-  b.onclick = ()=> send({type:"smith"});
-  box.appendChild(a); box.appendChild(b); st.appendChild(box);
+  const opt = (kbd, label, note, action, disabled) => {
+    const b = el("button","choice",
+      `<span class="k">${kbd}</span> <b>${label}</b> — ${note}`);
+    // Rest was offered as a live option at full HP, healing nothing.
+    if(disabled){ b.disabled = true; b.classList.add("spent"); }
+    else b.onclick = ()=> send(action);
+    box.appendChild(b);
+  };
+  opt(1, "Rest", full ? `you are already at ${p.hp}/${p.max_hp}`
+                      : `heal ${heal} HP <span class="ghost">(you are at `+
+                        `${p.hp}/${p.max_hp})</span>`,
+      {type:"rest"}, full);
+  opt(2, "Smith", "upgrade a card", {type:"smith"});
+  opt(3, "Purge", "remove a card from your deck", {type:"purge"});
+  st.appendChild(box);
 }
 
 function renderShop(st){
@@ -522,32 +541,32 @@ function renderShop(st){
   sh.cards.forEach((c,i) => row.appendChild(cardEl(c,{price:c.price, kbd:i+1,
     dim: c.price>gold, onclick: ()=> c.price<=gold && send({type:"shop_buy",what:"card",idx:i})})));
   st.appendChild(row);
+  // Everything below the cards used to be mouse-only, and its "not enough gold"
+  // was a native title= that never appeared on touch.
+  const stall = (kbd, name, desc, price, action, blocked) => {
+    const it = el("div","item",
+      `<span class="nm">${esc(name)}</span><span class="ds">${esc(desc)}</span>`);
+    const b = el("button","buy",`<kbd>${kbd}</kbd> ${price} gold`);
+    const why = blocked || (gold < price ? "Not enough gold" : "");
+    b.disabled = Boolean(why);
+    if(why) b.setAttribute("data-tip", why);
+    else b.onclick = ()=> send(action);
+    it.appendChild(b); st.appendChild(it);
+    SHOP_KEYS[kbd] = why ? null : action;
+  };
+  SHOP_KEYS = {};
   if(sh.relic){
-    const it = el("div","item",
-      `<span class="nm">${esc(sh.relic.name)}</span><span class="ds">${esc(sh.relic.desc)}</span>`);
-    const b = el("button","buy",`${sh.relic_price} gold`);
-    b.disabled = gold < sh.relic_price;
-    b.onclick = ()=> send({type:"shop_buy",what:"relic"});
-    it.appendChild(b); st.appendChild(it);
+    stall("r", sh.relic.name, sh.relic.desc, sh.relic_price,
+          {type:"shop_buy", what:"relic"});
   }
-  sh.potions.forEach((q,i) => {
-    const it = el("div","item",
-      `<span class="nm">${esc(q.name)}</span><span class="ds">${esc(q.desc)}</span>`);
-    const b = el("button","buy",`${q.price} gold`);
-    const full = S.player.potions.length >= S.player.max_potions;
-    b.disabled = gold < q.price || full;
-    b.title = full ? "Your potion slots are full"
-                   : (gold < q.price ? "Not enough gold" : "");
-    b.onclick = ()=> send({type:"shop_buy",what:"potion",idx:i});
-    it.appendChild(b); st.appendChild(it);
-  });
+  const full = S.player.potions.length >= S.player.max_potions;
+  sh.potions.forEach((q,i) =>
+    stall(SHOP_POTION_KEYS[i], q.name, q.desc, q.price,
+          {type:"shop_buy", what:"potion", idx:i},
+          full ? "Your potion slots are full" : ""));
   if(!sh.removed){
-    const it = el("div","item",
-      `<span class="nm">Card removal</span><span class="ds">Purge one card from your deck.</span>`);
-    const b = el("button","buy",`${sh.removal_price} gold`);
-    b.disabled = gold < sh.removal_price;
-    b.onclick = ()=> send({type:"shop_buy",what:"removal"});
-    it.appendChild(b); st.appendChild(it);
+    stall("x", "Card removal", "Purge one card from your deck.", sh.removal_price,
+          {type:"shop_buy", what:"removal"});
   }
   st.appendChild(ctaButton("Leave <kbd>Esc</kbd>", ()=> send({type:"shop_leave"})));
 }
@@ -790,17 +809,21 @@ const SCREENS = {
   },
   rest: {
     render: renderRest,
-    hint: "1 rest · 2 smith",
-    keys: k => { if(k === "1") send({type:"rest"});
-                 if(k === "2") send({type:"smith"}); },
+    hint: "1 rest · 2 smith · 3 purge",
+    keys: k => { if(k === "1" && S.player.hp < S.player.max_hp) send({type:"rest"});
+                 if(k === "2") send({type:"smith"});
+                 if(k === "3") send({type:"purge"}); },
   },
   shop: {
     render: renderShop,
-    hint: "1–5 buy cards · esc leave",
+    hint: "1–5 cards · r relic · q w e potions · x removal · esc leave",
     keys: (k, num) => {
       if(num >= 0 && num < S.shop.cards.length &&
-         S.shop.cards[num].price <= S.player.gold)
+         S.shop.cards[num].price <= S.player.gold){
         send({type:"shop_buy", what:"card", idx:num});
+        return;
+      }
+      if(SHOP_KEYS[k]) send(SHOP_KEYS[k]);
     },
   },
   event: {
