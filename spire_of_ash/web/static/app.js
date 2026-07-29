@@ -12,7 +12,8 @@ const SPRITE = {
   "Fat Gremlin":"👹","Shield Gremlin":"🛡️","Sentry":"🗿","Byrd":"🦅","Chosen":"🧛",
   "Mystic":"🧝","Gremlin Nob":"👺","Lagavulin":"🐛","Book of Stabbing":"📕",
   "Taskmaster":"🪓","The Guardian":"🤖","Hexaghost":"👻","Slime Boss":"🟩","The Champ":"⚔️",
-  "Ash Warden":"🛡️","The Ashen Sovereign":"👑"
+  "Ash Warden":"🛡️","The Ashen Sovereign":"👑",
+  "Ash Pup":"🐺","Slag Golem":"🗿","Cinder Moth":"🦋","Bone Picker":"🦤"
 };
 const RELIC_ICON = {
   "Burning Blood":"🩸","Bag of Marbles":"🔮","Anchor":"⚓","Vajra":"🔱",

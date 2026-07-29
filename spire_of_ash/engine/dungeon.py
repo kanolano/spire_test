@@ -68,27 +68,41 @@ def _link(rng, cur, nxt):
             cur[j]["edges"] = sorted(set(cur[j]["edges"]) | {t})
 
 
+# An act used to draw from 5 weak and 8 strong groups, so a climb met the same
+# handful of fights over and over.
 ACT_POOLS = {
     1: dict(
         weak=[["cultist"], ["jaw_worm"], ["louse", "louse"],
-              ["small_slime", "small_slime"], ["mad_gremlin", "sneaky_gremlin"]],
+              ["small_slime", "small_slime"], ["mad_gremlin", "sneaky_gremlin"],
+              ["ash_pup", "ash_pup"], ["cinder_moth"], ["louse", "small_slime"],
+              ["ash_pup", "louse"]],
         strong=[["jaw_worm"], ["cultist", "louse"], ["fungi", "fungi"],
                 ["acid_slime"], ["spike_slime", "small_slime"],
                 ["louse", "louse", "louse"],
                 ["mad_gremlin", "fat_gremlin", "sneaky_gremlin", "shield_gremlin"],
-                ["acid_slime", "spike_slime"]],
+                ["acid_slime", "spike_slime"],
+                ["ash_pup", "ash_pup", "ash_pup"], ["slag_golem"],
+                ["cinder_moth", "ash_pup"], ["fungi", "louse", "louse"],
+                ["cinder_moth", "cinder_moth"], ["slag_golem", "ash_pup"]],
         elite=["gremlin_nob", "lagavulin"], boss=["guardian", "slime_boss"]),
     2: dict(
-        weak=[["byrd"], ["fungi", "fungi"], ["jaw_worm", "louse"], ["sentry"]],
+        weak=[["byrd"], ["fungi", "fungi"], ["jaw_worm", "louse"], ["sentry"],
+              ["slag_golem"], ["bone_picker"], ["cinder_moth", "cinder_moth"]],
         strong=[["chosen"], ["mystic"], ["byrd", "byrd"], ["sentry", "sentry"],
                 ["chosen", "cultist"], ["mystic", "byrd"], ["acid_slime", "spike_slime"],
-                ["jaw_worm", "jaw_worm"]],
+                ["jaw_worm", "jaw_worm"],
+                ["bone_picker", "byrd"], ["slag_golem", "cinder_moth"],
+                ["sentry", "byrd"], ["mystic", "ash_pup", "ash_pup"],
+                ["bone_picker", "bone_picker"]],
         elite=["taskmaster", "gremlin_nob"], boss=["hexaghost", "champ"]),
     3: dict(
-        weak=[["chosen"], ["mystic"], ["sentry", "sentry"], ["byrd", "byrd"]],
+        weak=[["chosen"], ["mystic"], ["sentry", "sentry"], ["byrd", "byrd"],
+              ["bone_picker", "bone_picker"], ["slag_golem", "slag_golem"]],
         strong=[["chosen", "chosen"], ["sentry", "sentry", "sentry"],
                 ["mystic", "chosen"], ["byrd", "byrd", "byrd"],
-                ["acid_slime", "acid_slime"], ["chosen", "mystic"]],
+                ["acid_slime", "acid_slime"], ["chosen", "mystic"],
+                ["bone_picker", "chosen"], ["slag_golem", "sentry", "sentry"],
+                ["byrd", "byrd", "cinder_moth"], ["bone_picker", "mystic"]],
         elite=["book_of_stabbing", "taskmaster", "ash_warden"],
         boss=["ashen_sovereign"]),
 }

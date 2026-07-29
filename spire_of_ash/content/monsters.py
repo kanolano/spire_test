@@ -121,12 +121,15 @@ MONSTERS = {
         "Caw": mv("buff", fn=_grow(2)),
     }, pick=weighted_pick([("Peck", 50, 2), ("Swoop", 30, 2), ("Caw", 20, 1)])),
 
+    # A pair of these was landing 30+ in a turn *and* stacking Vulnerable, while
+    # Drain compounded their Strength — the damage came down rather than the
+    # debuffs, so the fight still plays as a nasty attrition puzzle.
     "chosen": dict(name="Chosen", hp=(50, 58), moves={
         "Hex": mv("debuff", fn=lambda cb, e: cb.add_card_to_pile(Card("regret"), True)),
-        "Zap": mv("attack", 18),
-        "Debilitate": mv("attack", 10, fn=_debuff("vulnerable", 2)),
+        "Zap": mv("attack", 12),
+        "Debilitate": mv("attack", 7, fn=_debuff("vulnerable", 2)),
         "Drain": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "weak", 3),
-                                                cb.apply(e, "strength", 3))),
+                                                cb.apply(e, "strength", 2))),
     }, pick=lambda e: "Hex" if e.turn == 0 else weighted_pick(
         [("Zap", 30, 2), ("Debilitate", 40, 2), ("Drain", 30, 1)])(e)),
 
@@ -135,6 +138,31 @@ MONSTERS = {
         "Attack Debuff": mv("attack", 9, fn=_debuff("weak", 2)),
         "Buff": mv("buff", fn=lambda cb, e: [cb.apply(x, "strength", 2) for x in cb.living()]),
     }, pick=weighted_pick([("Heal", 30, 1), ("Attack Debuff", 40, 2), ("Buff", 30, 1)])),
+
+    # Four commons whose job is variety: a pack that rewards sweeping damage, a
+    # predictable blocker that rewards reading intents, a chip-damage nuisance
+    # that clogs the deck, and a healer-of-itself that punishes slow removal.
+    "ash_pup": dict(name="Ash Pup", hp=(13, 17), moves={
+        "Nip": mv("attack", 5),
+        "Snarl": mv("buff", fn=_grow(2)),
+    }, pick=weighted_pick([("Nip", 70, 3), ("Snarl", 30, 1)])),
+
+    "slag_golem": dict(name="Slag Golem", hp=(36, 42), moves={
+        "Harden": mv("block", fn=_block(12)),
+        "Smash": mv("attack", 13),
+    }, pick=cycle_pick(["Harden", "Smash"])),
+
+    "cinder_moth": dict(name="Cinder Moth", hp=(21, 26), moves={
+        "Scald": mv("attack", 5, fn=_add_cards("burn", 1)),
+        "Dust": mv("debuff", fn=_debuff("weak", 2)),
+        "Flit": mv("block", fn=_block(6)),
+    }, pick=weighted_pick([("Scald", 45, 2), ("Dust", 30, 1), ("Flit", 25, 2)])),
+
+    "bone_picker": dict(name="Bone Picker", hp=(30, 36), moves={
+        "Rend": mv("attack", 4, hits=3),
+        "Carrion Feast": mv("buff", fn=lambda cb, e: (cb.heal(e, 8),
+                                                      cb.apply(e, "strength", 1))),
+    }, pick=weighted_pick([("Rend", 65, 2), ("Carrion Feast", 35, 1)])),
 
     # ── elites ──
     "gremlin_nob": dict(name="Gremlin Nob", hp=(82, 86), elite=True, moves={
