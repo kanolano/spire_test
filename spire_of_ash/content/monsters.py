@@ -164,11 +164,13 @@ MONSTERS = {
     }, pick=weighted_pick([("Scouring Wave", 35, 2), ("Whip", 40, 2), ("Rally", 25, 1)])),
 
     # ── bosses ──
-    # 240 HP against a floor-15 act-1 deck was ~13 turns of chip damage while
-    # being hit for 32; almost nobody got through it.
-    "guardian": dict(name="The Guardian", hp=(180, 180), boss=True, moves={
+    # Act 1 was a wall, and the reason was spike damage rather than length: one
+    # unblocked Fierce Bash was 43% of a Sentinel's max HP. The big hits came
+    # down and some of the HP went back, so the fight is still long enough to
+    # need a plan without being decided by a single unlucky turn.
+    "guardian": dict(name="The Guardian", hp=(200, 200), boss=True, moves={
         "Charging Up": mv("block", fn=_block(9)),
-        "Fierce Bash": mv("attack", 32),
+        "Fierce Bash": mv("attack", 22),
         "Vent Steam": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "vulnerable", 2),
                                                      cb.apply(cb.player, "weak", 2))),
         "Whirlwind": mv("attack", 5, hits=4),
@@ -185,10 +187,11 @@ MONSTERS = {
         "Divider" if e.turn == 1 else
         ["Sear", "Tackle", "Sear", "Inferno", "Tackle", "Sear"][(e.turn - 2) % 6])),
 
-    "slime_boss": dict(name="Slime Boss", hp=(140, 140), boss=True, moves={
+    # Slam landed every third turn for half a Sentinel's max HP.
+    "slime_boss": dict(name="Slime Boss", hp=(155, 155), boss=True, moves={
         "Goop Spray": mv("debuff", fn=_add_cards("slimed", 3)),
         "Preparing": mv("block", fn=_block(15)),
-        "Slam": mv("attack", 38),
+        "Slam": mv("attack", 26),
     }, pick=cycle_pick(["Goop Spray", "Preparing", "Slam"])),
 
     "champ": dict(name="The Champ", hp=(300, 300), boss=True, moves={

@@ -37,6 +37,7 @@ log = logging.getLogger("spire")
 class Handler(BaseHTTPRequestHandler):
     server_version = "SpireOfAsh"
     protocol_version = "HTTP/1.1"
+    _body = b""                   # set per-request by do_POST
 
     # ── plumbing ──
     @property
@@ -98,16 +99,31 @@ class Handler(BaseHTTPRequestHandler):
         host = self.headers.get("Host", "")
         return origin.split("//")[-1] == host
 
-    def _read_body(self):
+    def _drain_body(self):
+        """Take the whole request body off the socket.
+
+        This has to happen for *every* POST, including ones we refuse. We speak
+        HTTP/1.1, so the connection is reused: bytes left unread become the
+        start of the next request line. /abandon never read its body, so the
+        very next click after Quit was parsed as a request whose method was
+        `{}POST` and came back 501.
+        """
         raw = self.headers.get("Content-Length") or "0"
         try:
             n = int(raw)
         except ValueError:
             raise InvalidAction("Bad Content-Length header.")
         if n < 0 or n > MAX_BODY:
+            # Do not read it just to throw it away; the stream is untrustworthy
+            # from here, so hang up rather than reuse the connection.
+            self.close_connection = True
             raise InvalidAction("Request body too large.")
+        return self.rfile.read(n)
+
+    def _read_body(self):
+        """The JSON body. do_POST has already drained it off the socket."""
         try:
-            return json.loads(self.rfile.read(n) or b"{}")
+            return json.loads(self._body or b"{}")
         except (json.JSONDecodeError, UnicodeDecodeError):
             raise InvalidAction("Body is not valid JSON.")
 
@@ -119,6 +135,11 @@ class Handler(BaseHTTPRequestHandler):
         self._dispatch(GET_ROUTES)
 
     def do_POST(self):
+        try:
+            self._body = self._drain_body()
+        except InvalidAction as e:
+            self._error(400, str(e))
+            return
         if not self._same_origin():
             self._error(403, "Cross-origin requests are not allowed.")
             return

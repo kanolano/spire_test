@@ -1,5 +1,6 @@
 """The HTTP layer: routing, validation, session isolation, resume."""
 
+import http.client
 import json
 import os
 import shutil
@@ -198,6 +199,46 @@ class TestSessions(WebTestCase):
         c.request("/action", {"type": "new_run", "cls": "ashwalker"})
         _, body, _ = c.request("/action", {"type": "new_run", "cls": "ashwalker"})
         self.assertEqual(body["player"]["cls"], "ashwalker")
+
+    def test_a_post_does_not_desync_a_kept_alive_connection(self):
+        """/abandon never read its body, and the server speaks HTTP/1.1: the
+        unread bytes became the next request line, so the click after Quit came
+        back 501 Unsupported method."""
+        conn = http.client.HTTPConnection("127.0.0.1", self.port)
+        try:
+            hdrs = {"Content-Type": "application/json"}
+            conn.request("POST", "/abandon", body="{}", headers=hdrs)
+            first = conn.getresponse()
+            first.read()
+            self.assertEqual(first.status, 200)
+            cookie = (first.getheader("Set-Cookie") or "").split(";")[0]
+
+            # same connection, as a browser would
+            conn.request("POST", "/action",
+                         body=json.dumps({"type": "new_run", "cls": "ashwalker"}),
+                         headers=dict(hdrs, Cookie=cookie))
+            second = conn.getresponse()
+            payload = json.loads(second.read())
+            self.assertEqual(second.status, 200)
+            self.assertEqual(payload["player"]["cls"], "ashwalker")
+        finally:
+            conn.close()
+
+    def test_a_refused_cross_origin_post_also_drains(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port)
+        try:
+            conn.request("POST", "/action", body=json.dumps({"type": "new_run"}),
+                         headers={"Content-Type": "application/json",
+                                  "Origin": "http://evil.example"})
+            first = conn.getresponse()
+            first.read()
+            self.assertEqual(first.status, 403)
+            conn.request("GET", "/state")
+            second = conn.getresponse()
+            second.read()
+            self.assertEqual(second.status, 200)
+        finally:
+            conn.close()
 
     def test_store_evicts_over_the_cap(self):
         store = SessionStore(directory=None, max_sessions=3)
