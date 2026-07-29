@@ -45,12 +45,22 @@ class Combatant:
         self.alive = d["alive"]
 
 
-def damage_after_modifiers(attacker, base, target, str_mult=1):
-    """Strength, Weak and Vulnerable applied to a raw attack value."""
-    dmg = base + attacker.s("strength") * str_mult
+def damage_after_modifiers(attacker, base, target, str_mult=1,
+                           strength=None, vulnerable=None):
+    """Strength, Weak and Vulnerable applied to a raw attack value.
+
+    `strength` and `vulnerable` override what the combatants carry right now.
+    Only `intent_preview` passes them, to project the state the blow will
+    actually land in rather than the state as of this instant.
+    """
+    if strength is None:
+        strength = attacker.s("strength")
+    dmg = base + strength * str_mult
     if attacker.s("weak"):
         dmg = int(dmg * B.WEAK_MULT)
-    if target and target.s("vulnerable"):
+    if vulnerable is None:
+        vulnerable = target.s("vulnerable") if target else 0
+    if vulnerable:
         dmg = int(dmg * B.VULNERABLE_MULT)
     return max(0, dmg)
 
@@ -91,14 +101,29 @@ class Enemy(Combatant):
         self.intent = self.spec["pick"](self)
 
     def intent_preview(self, player):
-        """Structured intent for a client to render. None when nothing is set."""
+        """Structured intent for a client to render. None when nothing is set.
+
+        This number is what the player blocks against, so it has to be the
+        damage that will land, not the damage as of this instant. Two things
+        happen in between, and neither used to be accounted for:
+
+        * the player's decaying debuffs tick down at the end of their turn,
+          before any enemy acts, so a last stack of Vulnerable no longer
+          applies — the preview used to promise damage that never arrived;
+        * this enemy gains Strength from Ritual at the start of its own turn,
+          before it swings. A Cultist therefore hit for exactly its Ritual
+          value more than advertised, every turn, compounding.
+        """
         if not self.intent:
             return None
         m = self.moves[self.intent]
         kind = m["kind"]
         if kind == "attack":
             return {"kind": "attack",
-                    "damage": damage_after_modifiers(self, m["dmg"], player),
+                    "damage": damage_after_modifiers(
+                        self, m["dmg"], player,
+                        strength=self.s("strength") + self.s("ritual"),
+                        vulnerable=max(0, player.s("vulnerable") - 1) if player else 0),
                     "hits": m["hits"],
                     "extra": bool(m["fn"]),
                     "note": m["note"]}
