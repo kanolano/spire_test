@@ -200,18 +200,44 @@ def screen_reward(run, st):
     clear()
     r = st["reward"]
     print(c("\n  VICTORY!\n", BOLD, GRN))
-    print(c(f"  You find {r['gold']} gold.", YEL))
+    for line in r["log"]:
+        print("  " + c(line, GRY))
+    print(c(f"\n  You find {r['gold']} gold.", YEL))
+
+    keys = []
     if r["relic"]:
-        print(c(f"  Relic obtained: {r['relic']['name']} — {r['relic']['desc']}", MAG))
+        taken = c("  (taken)", GRY) if r["relic_taken"] else ""
+        print(c(f"   r. {r['relic']['name']} — {r['relic']['desc']}", MAG) + taken)
+        if not r["relic_taken"]:
+            keys.append("r")
     if r["potion"]:
-        print(c(f"  Potion obtained: {r['potion']['name']}", MAG))
+        if r["potion_taken"]:
+            note = c("  (taken)", GRY)
+        elif r["potions_full"]:
+            note = c("  (no free slot)", RED)
+        else:
+            note = ""
+            keys.append("p")
+        print(c(f"   p. {r['potion']['name']} — {r['potion']['desc']}", MAG) + note)
+
     print()
-    print(c("  Choose a card to add to your deck:\n", YEL))
-    print_cards(r["cards"])
-    ans = prompt(c("\n  card # / (s)kip > ", YEL)).lower()
-    if ans.isdigit() and 1 <= int(ans) <= len(r["cards"]):
-        return {"type": "reward", "idx": int(ans) - 1}
-    return {"type": "reward", "idx": None}
+    if r["card_taken"]:
+        print(c("  You have taken your card.\n", GRY))
+    else:
+        print(c("  Choose a card to add to your deck:\n", YEL))
+        print_cards(r["cards"])
+        keys.append("card #")
+
+    choices = " / ".join(keys + ["(c)ontinue"])
+    ans = prompt(c(f"\n  {choices} > ", YEL)).lower()
+    if ans == "r" and r["relic"] and not r["relic_taken"]:
+        return {"type": "reward", "what": "relic"}
+    if ans == "p" and r["potion"] and not r["potion_taken"]:
+        return {"type": "reward", "what": "potion"}
+    if (ans.isdigit() and not r["card_taken"]
+            and 1 <= int(ans) <= len(r["cards"])):
+        return {"type": "reward", "what": "card", "idx": int(ans) - 1}
+    return {"type": "reward_done"}
 
 
 def screen_choose(run, st):
@@ -283,8 +309,11 @@ def screen_event(run, st):
         print("  " + c(line, GRY))
     print()
     if ev["result"] is None:
-        for i, label in enumerate(ev["options"], 1):
-            print(f"   {i}. {label}")
+        for i, opt in enumerate(ev["options"], 1):
+            print(f"   {i}. {opt['label']}")
+            if opt["preview"]:
+                for line in wrap(opt["preview"], min(term_width() - 12, 78)):
+                    print("      " + c(line, GRY))
         ans = prompt(c("\n  > ", YEL))
         if ans.isdigit() and 1 <= int(ans) <= len(ev["options"]):
             return {"type": "event_choose", "idx": int(ans) - 1}

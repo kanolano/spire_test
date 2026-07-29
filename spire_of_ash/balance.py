@@ -54,6 +54,7 @@ GOLD_REWARD = {"monster": (10, 20), "elite": (25, 35), "boss": (80, 100)}
 POTION_DROP_CHANCE = {"monster": 0.4, "other": 0.6}
 CARD_RARITY_CHANCES = {"monster": (0.62, 0.31, 0.07), "other": (0.5, 0.38, 0.12)}
 REWARD_CARD_COUNT = 3
+REWARD_LOG_LINES = 3            # tail of the fight shown on the results screen
 
 # ── campfire ──
 REST_HEAL_FRACTION = 0.3

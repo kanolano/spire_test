@@ -40,7 +40,7 @@ def autoplay(run, seed=0, max_steps=6000, keep_alive=False):
         elif screen == "combat":
             _combat_step(run, st, pick)
         elif screen == "reward":
-            run.apply({"type": "reward", "idx": 0})
+            _reward_step(run, st)
         elif screen == "choose":
             run.apply({"type": "choose", "idx": 0})
         elif screen == "rest":
@@ -63,6 +63,19 @@ def autoplay(run, seed=0, max_steps=6000, keep_alive=False):
         else:
             break
     return run
+
+
+def _reward_step(run, st):
+    """Claim everything on offer, one item per step, then leave."""
+    p = st["pending"]
+    if p["relic"]:
+        run.apply({"type": "reward", "what": "relic"})
+    elif p["potion"]:
+        run.apply({"type": "reward", "what": "potion"})
+    elif p["card"]:
+        run.apply({"type": "reward", "what": "card", "idx": 0})
+    else:
+        run.apply({"type": "reward_done"})
 
 
 def _combat_step(run, st, pick):

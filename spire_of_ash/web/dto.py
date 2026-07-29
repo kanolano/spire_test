@@ -10,6 +10,7 @@ from ..content.cards import CARDS
 from ..content.classes import CLASSES
 from ..content.potions import POTIONS
 from ..content.relics import RELICS
+from ..statuses import describe
 
 
 def card_data(card, energy=None, idx=None):
@@ -51,7 +52,20 @@ def potion_dto(key):
 
 
 def statuses_dto(triples):
-    return [{"key": k, "label": label, "value": n} for k, label, n in triples]
+    """Chips carry their own explanation so the client can tooltip them."""
+    out = []
+    for key, label, n in triples:
+        name, desc = describe(key)
+        out.append({"key": key, "label": label, "value": n,
+                    "name": name, "desc": desc})
+    return out
+
+
+def event_option_dto(option):
+    """Older saves stored options as bare label strings."""
+    if isinstance(option, str):
+        return {"label": option, "preview": ""}
+    return {"label": option["label"], "preview": option.get("preview", "")}
 
 
 def _class_roster():
@@ -118,6 +132,10 @@ def view(run):
             "relic": relic_dto(r["relic"]) if r["relic"] else None,
             "potion": potion_dto(r["potion"]) if r["potion"] else None,
             "cards": cards_data(r["cards"]),
+            "relic_taken": bool(r.get("relic_taken")),
+            "potion_taken": bool(r.get("potion_taken")),
+            "card_taken": bool(r.get("card_taken")),
+            "potions_full": len(p.potions) >= p.max_potions,
         }
     if run.choose:
         ch = run.choose
@@ -140,6 +158,6 @@ def view(run):
     if run.event:
         e = run.event
         st["event"] = {"title": e["title"], "text": e["text"],
-                       "options": e["options"], "result": e["result"],
-                       "then": e["then"]}
+                       "options": [event_option_dto(o) for o in e["options"]],
+                       "result": e["result"], "then": e["then"]}
     return st

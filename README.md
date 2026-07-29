@@ -85,6 +85,12 @@ Hooks: `on_pickup`, `on_combat_start`, `on_turn_start`, `on_turn_end`,
 `draw_bonus`. Cards carry an `fx(combat, card, target)`; events return their text
 and may ask for a follow-up picker (`remove`, `upgrade`, `duplicate`).
 
+An event handler also needs a `@preview("…")` line saying what the option costs
+and grants — the label is flavour, and a handler cannot be dry-run to find out,
+since it mutates the player and draws from `run.rng` in the same pass. Statuses
+declare their own `(label, name, description)` in `spire_of_ash/statuses.py`, and
+both clients show the description on hover.
+
 `tests/test_content.py` walks every table, so a card key typo'd into a class pool
 fails the suite instead of crashing a run on a seed you cannot reproduce.
 

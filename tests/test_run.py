@@ -2,7 +2,7 @@
 
 import unittest
 
-from helpers import autoplay
+from helpers import autoplay, _reward_step
 
 from spire_of_ash import balance as B
 from spire_of_ash.engine.errors import InvalidAction
@@ -17,7 +17,7 @@ def short_script(run, steps=8):
         elif st["screen"] == "combat":
             run.apply({"type": "end_turn"})
         elif st["screen"] == "reward":
-            run.apply({"type": "reward", "idx": 0})
+            _reward_step(run, st)
         else:
             break
     return run.state()
@@ -195,6 +195,13 @@ class TestFlow(unittest.TestCase):
                 self.assertIsInstance(probe.event["result"], str)
                 self.assertTrue(probe.event["result"])
 
+    def test_event_options_carry_a_preview(self):
+        run = Run("sentinel", seed=5)
+        run.open_event()
+        for opt in run.event["options"]:
+            self.assertTrue(opt["label"])
+            self.assertTrue(opt["preview"])
+
     def test_act_transition_raises_max_hp(self):
         run = Run("sentinel", seed=5)
         before = run.player.max_hp
@@ -202,6 +209,80 @@ class TestFlow(unittest.TestCase):
         self.assertEqual(run.player.max_hp, before + B.ACT_MAX_HP_BONUS)
         self.assertEqual(run.act, 2)
         self.assertIsNotNone(run.banner)
+
+
+class TestRewards(unittest.TestCase):
+    """Rewards used to be granted the moment the last enemy died — the screen
+    reported a relic you already owned. Now nothing but gold moves until asked."""
+
+    def _reward(self, kind="elite", seed=5):
+        run = Run("sentinel", seed=seed)
+        run.start_combat(kind)
+        run.victory()
+        return run
+
+    def test_gold_is_still_banked_outright(self):
+        run = Run("sentinel", seed=5)
+        before = run.player.gold
+        run.start_combat("elite")
+        run.victory()
+        self.assertGreater(run.player.gold, before)
+
+    def test_a_relic_waits_to_be_claimed(self):
+        run = self._reward()
+        self.assertEqual(run.screen, "reward")
+        key = run.reward["relic"]
+        self.assertNotIn(key, run.player.relics)
+        run.apply({"type": "reward", "what": "relic"})
+        self.assertIn(key, run.player.relics)
+
+    def test_claiming_leaves_the_screen_open(self):
+        run = self._reward()
+        run.apply({"type": "reward", "what": "card", "idx": 0})
+        self.assertEqual(run.screen, "reward")
+        self.assertTrue(run.state()["pending"]["relic"])
+
+    def test_leaving_forfeits_whatever_was_not_claimed(self):
+        run = self._reward()
+        key, deck = run.reward["relic"], len(run.player.deck)
+        run.apply({"type": "reward_done"})
+        self.assertEqual(run.screen, "map")
+        self.assertNotIn(key, run.player.relics)
+        self.assertEqual(len(run.player.deck), deck)
+
+    def test_nothing_can_be_claimed_twice(self):
+        run = self._reward()
+        run.apply({"type": "reward", "what": "relic"})
+        with self.assertRaises(InvalidAction):
+            run.apply({"type": "reward", "what": "relic"})
+        run.apply({"type": "reward", "what": "card", "idx": 0})
+        with self.assertRaises(InvalidAction):
+            run.apply({"type": "reward", "what": "card", "idx": 1})
+
+    def test_a_full_potion_belt_refuses_the_potion(self):
+        run = self._reward()
+        run.reward["potion"] = "fire"
+        run.player.potions = ["block"] * run.player.max_potions
+        with self.assertRaises(InvalidAction):
+            run.apply({"type": "reward", "what": "potion"})
+        run.player.potions = []
+        run.apply({"type": "reward", "what": "potion"})
+        self.assertEqual(run.player.potions, ["fire"])
+
+    def test_an_absent_reward_cannot_be_taken(self):
+        run = self._reward(kind="monster")
+        self.assertIsNone(run.reward["relic"])
+        with self.assertRaises(InvalidAction):
+            run.apply({"type": "reward", "what": "relic"})
+        with self.assertRaises(InvalidAction):
+            run.apply({"type": "reward", "what": "nonsense"})
+
+    def test_a_boss_advances_the_act_only_on_leaving(self):
+        run = self._reward(kind="boss")
+        run.apply({"type": "reward", "what": "relic"})
+        self.assertEqual(run.act, 1, "claiming must not end the act")
+        run.apply({"type": "reward_done"})
+        self.assertEqual(run.act, 2)
 
 
 if __name__ == "__main__":

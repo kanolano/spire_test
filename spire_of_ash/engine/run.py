@@ -16,7 +16,7 @@ share one implementation of the rules.
 
 from .. import balance as B
 from ..content.classes import CLASSES, DEFAULT_CLASS
-from ..content.events import EVENTS
+from ..content.events import EVENTS, preview_of
 from ..content.pools import random_card_keys, roll_relic
 from ..content.potions import POTIONS
 from .card import Card
@@ -68,8 +68,12 @@ class Run:
         if self.screen == "combat":
             return {"kind": "combat_turn"}
         if self.screen == "reward":
-            return {"kind": "card_reward", "count": len(self.reward["cards"]),
-                    "skippable": True}
+            r = self.reward
+            return {"kind": "card_reward", "count": len(r["cards"]),
+                    "skippable": True,
+                    "card": not r.get("card_taken"),
+                    "relic": bool(r["relic"]) and not r.get("relic_taken"),
+                    "potion": bool(r["potion"]) and not r.get("potion_taken")}
         if self.screen == "choose":
             return {"kind": self.choose["kind"], "count": len(self.choose["cards"]),
                     "skippable": self.choose["allow_skip"]}
@@ -259,17 +263,16 @@ class Run:
         lo, hi = B.GOLD_REWARD[kind]
         gold = self.rng.randint(lo, hi)
         p.gold += gold
+        # Gold is banked outright; everything else waits to be claimed, so the
+        # player can look at a relic before it is bolted to them.
         rew = {"gold": gold, "kind": kind, "relic": None, "potion": None,
-               "log": list(cb.log[-6:])}
+               "relic_taken": False, "potion_taken": False, "card_taken": False,
+               "log": list(cb.log[-B.REWARD_LOG_LINES:])}
         if kind in ("elite", "boss"):
-            key = roll_relic(self.rng, p.relics)
-            p.add_relic(key)
-            rew["relic"] = key
+            rew["relic"] = roll_relic(self.rng, p.relics)
         chance = B.POTION_DROP_CHANCE["monster" if kind == "monster" else "other"]
         if self.rng.random() < chance and len(p.potions) < p.max_potions:
-            pk = self.rng.choice(list(POTIONS))
-            p.potions.append(pk)
-            rew["potion"] = pk
+            rew["potion"] = self.rng.choice(list(POTIONS))
         chances = B.CARD_RARITY_CHANCES["monster" if kind == "monster" else "other"]
         cards = [Card(k) for k in
                  random_card_keys(self.rng, B.REWARD_CARD_COUNT, chances, p.cls)]
@@ -281,14 +284,54 @@ class Run:
         self.combat = None
         self.screen = "reward"
 
-    def _do_reward(self, action):
-        self._need("reward")
+    def _claim_relic(self):
+        r = self.reward
+        if not r["relic"]:
+            raise InvalidAction("There is no relic to take.")
+        if r.get("relic_taken"):
+            raise InvalidAction("You have already taken it.")
+        self.player.add_relic(r["relic"])
+        r["relic_taken"] = True
+
+    def _claim_potion(self):
+        r, p = self.reward, self.player
+        if not r["potion"]:
+            raise InvalidAction("There is no potion to take.")
+        if r.get("potion_taken"):
+            raise InvalidAction("You have already taken it.")
+        if len(p.potions) >= p.max_potions:
+            raise InvalidAction("Your potion slots are full.")
+        p.potions.append(r["potion"])
+        r["potion_taken"] = True
+
+    def _claim_card(self, action):
+        r = self.reward
         idx = self._index(action, allow_none=True)
-        cards = self.reward["cards"]
-        if idx is not None:
-            if not 0 <= idx < len(cards):
-                raise InvalidAction("No such reward card.")
-            self.player.deck.append(cards[idx])
+        if idx is None:
+            return
+        if r.get("card_taken"):
+            raise InvalidAction("You have already taken a card.")
+        cards = r["cards"]
+        if not 0 <= idx < len(cards):
+            raise InvalidAction("No such reward card.")
+        self.player.deck.append(cards[idx])
+        r["card_taken"] = True
+
+    def _do_reward(self, action):
+        """Claim one item. The screen stays open until `reward_done`."""
+        self._need("reward")
+        what = action.get("what", "card")
+        if what == "relic":
+            self._claim_relic()
+        elif what == "potion":
+            self._claim_potion()
+        elif what == "card":
+            self._claim_card(action)
+        else:
+            raise InvalidAction(f"Cannot take {what!r}.")
+
+    def _do_reward_done(self, action):
+        self._need("reward")
         kind = self.reward["kind"]
         self.to_map()
         if kind == "boss":
@@ -431,7 +474,8 @@ class Run:
         idx = self.rng.randrange(len(EVENTS))
         ev = EVENTS[idx]
         self.event = {"index": idx, "title": ev["title"], "text": ev["text"],
-                      "options": [label for label, _ in ev["options"]],
+                      "options": [{"label": label, "preview": preview_of(fn)}
+                                  for label, fn in ev["options"]],
                       "result": None, "then": None}
         self.screen = "event"
 
@@ -590,6 +634,7 @@ _HANDLERS = {
     "potion": Run._do_potion,
     "end_turn": Run._do_end_turn,
     "reward": Run._do_reward,
+    "reward_done": Run._do_reward_done,
     "rest": Run._do_rest,
     "smith": Run._do_smith,
     "choose": Run._do_choose,

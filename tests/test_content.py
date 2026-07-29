@@ -11,7 +11,7 @@ from helpers import make_combat
 from spire_of_ash import balance as B
 from spire_of_ash.content.cards import CARDS
 from spire_of_ash.content.classes import CLASSES, DEFAULT_CLASS
-from spire_of_ash.content.events import EVENTS
+from spire_of_ash.content.events import EVENTS, preview_of
 from spire_of_ash.content.monsters import MONSTERS
 from spire_of_ash.content.pools import random_card_keys, roll_relic
 from spire_of_ash.content.potions import POTIONS
@@ -20,7 +20,7 @@ from spire_of_ash.engine.card import Card
 from spire_of_ash.engine.combatant import Player
 from spire_of_ash.engine.dungeon import ACT_POOLS
 from spire_of_ash.rng import Rng
-from spire_of_ash.statuses import STATUS_LABELS
+from spire_of_ash.statuses import STATUS_LABELS, STATUSES, describe
 
 HOOKS = {"on_pickup", "on_combat_start", "on_turn_start", "on_turn_end",
          "on_combat_end", "on_attack", "on_card_played", "on_exhaust",
@@ -228,11 +228,27 @@ class TestContentIntegrity(unittest.TestCase):
                 self.assertTrue(label)
                 self.assertTrue(callable(fn))
 
+    def test_every_event_option_previews_its_effect(self):
+        """A label is flavour; without a preview the player is guessing."""
+        for ev in EVENTS:
+            for label, fn in ev["options"]:
+                self.assertTrue(preview_of(fn),
+                                f"{ev['title']} / {label} has no preview")
+
     def test_statuses_used_by_cards_have_labels(self):
         """Anything shown to the player needs a label to render."""
         for key in ("strength", "dexterity", "vulnerable", "weak", "frail",
                     "poison", "thorns"):
             self.assertTrue(STATUS_LABELS.get(key))
+
+    def test_every_shown_status_explains_itself(self):
+        """A four-letter chip is meaningless without the tooltip behind it."""
+        for key, (label, name, desc) in STATUSES.items():
+            if not label:
+                continue          # hidden bookkeeping, never rendered
+            self.assertTrue(name, f"{key} has no name")
+            self.assertTrue(desc, f"{key} has no description")
+            self.assertEqual(describe(key), (name, desc))
 
     def test_random_card_keys_respects_the_class(self):
         rng = Rng(5)

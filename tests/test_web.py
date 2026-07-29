@@ -271,6 +271,40 @@ class TestDto(unittest.TestCase):
         self.assertIn("name", v["player"]["relics"][0])
         self.assertIn("desc", v["player"]["potions"][0])
 
+    def test_statuses_ship_their_explanation(self):
+        """The chip shows "Vuln 2"; the tooltip needs the rest."""
+        run = Run("sentinel", seed=1)
+        run.player.st["vulnerable"] = 2
+        chip = view(run)["player"]["statuses"][0]
+        self.assertEqual(chip["label"], "Vuln")
+        self.assertEqual(chip["name"], "Vulnerable")
+        self.assertIn("more damage", chip["desc"])
+
+    def test_event_options_ship_a_preview(self):
+        run = Run("sentinel", seed=1)
+        run.open_event()
+        for opt in view(run)["event"]["options"]:
+            self.assertTrue(opt["label"] and opt["preview"])
+
+    def test_event_options_survive_a_pre_preview_save(self):
+        """Saves written before previews existed stored bare label strings."""
+        run = Run("sentinel", seed=1)
+        run.open_event()
+        run.event["options"] = ["Ask for healing", "Leave"]
+        self.assertEqual(view(run)["event"]["options"],
+                         [{"label": "Ask for healing", "preview": ""},
+                          {"label": "Leave", "preview": ""}])
+
+    def test_reward_ships_what_is_still_claimable(self):
+        run = Run("sentinel", seed=5)
+        run.start_combat("elite")
+        run.victory()
+        r = view(run)["reward"]
+        self.assertFalse(r["relic_taken"] or r["card_taken"])
+        self.assertIn("desc", r["relic"])
+        run.apply({"type": "reward", "what": "relic"})
+        self.assertTrue(view(run)["reward"]["relic_taken"])
+
     def test_class_roster_only_ships_on_the_select_screen(self):
         picked = Run("sentinel", seed=1)
         self.assertNotIn("classes", view(picked))

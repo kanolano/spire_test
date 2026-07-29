@@ -34,8 +34,14 @@ const NODE = {
 };
 const LETTERS = "abcdefgh";
 const POTION_KEYS = "qwrtyu";          // was hardcoded as "qwr" in three places
+// Anything carrying these two attributes gets the hover/focus/tap tooltip.
+const tipAttrs = (name, desc) =>
+  ` data-tip="${esc(name)}" data-tip-desc="${esc(desc || "")}"`;
 const statusChip = s =>
-  `<span class="chip st" data-k="${esc(s.key)}">${esc(s.label)} ${s.value}</span>`;
+  `<span class="chip st" data-k="${esc(s.key)}" tabindex="0"` +
+  tipAttrs(s.name || s.label, s.desc) +
+  ` aria-label="${esc(s.name || s.label)} ${s.value}: ${esc(s.desc || "")}">` +
+  `${esc(s.label)} ${s.value}</span>`;
 // The centred continue/skip/leave button was copy-pasted six times.
 function ctaButton(label, onclick, cls){
   const b = el("button", cls || "tbtn", label);
@@ -69,6 +75,40 @@ function setOffline(on, message){
   const curtain = $("#curtain");
   if(message) $("#curtain-msg").textContent = message;
   curtain.hidden = !on;
+}
+
+/* ── tooltips ───────────────────────────────────────────────
+   Status chips were cursor:help with nothing behind them — the label is a
+   four-letter abbreviation and the game never said anywhere what it meant.
+   Relics and potions had native title=, which is slow to appear and shows
+   nothing at all on touch. Both now feed one element. */
+let tipFor = null;
+
+function showTip(node){
+  const name = node.getAttribute("data-tip");
+  if(!name) return;
+  const desc = node.getAttribute("data-tip-desc");
+  const tip = $("#tip");
+  tip.innerHTML = `<b>${esc(name)}</b>` + (desc ? `<span>${esc(desc)}</span>` : "");
+  tip.hidden = false;
+  tipFor = node;
+  placeTip(node);
+}
+function placeTip(node){
+  const tip = $("#tip"), r = node.getBoundingClientRect(), pad = 8;
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  const left = Math.min(Math.max(pad, r.left + r.width/2 - w/2),
+                        window.innerWidth - w - pad);
+  // below the chip, unless that would run off the bottom
+  let top = r.bottom + pad;
+  if(top + h > window.innerHeight - pad) top = r.top - h - pad;
+  tip.style.left = Math.round(left) + "px";
+  tip.style.top = Math.round(Math.max(pad, top)) + "px";
+}
+function hideTip(){
+  if(!tipFor) return;
+  $("#tip").hidden = true;
+  tipFor = null;
 }
 
 async function api(path, options){
@@ -169,14 +209,15 @@ function renderTop(){
   $("#s-gold").innerHTML = `<span class="ic" style="color:var(--gold)">◉</span> ${p.gold}`;
   $("#s-decksize").textContent = `(${p.deck_size})`;
   $("#s-status").innerHTML = p.statuses.map(statusChip).join("");
-  // title= is invisible on touch, so these are buttons that open the overlay
+  // native title= is slow and invisible on touch, so these use the same tooltip
+  // as the status chips and stay buttons that open the overlay
   $("#s-relics").innerHTML = p.relics.map((r,i) =>
-    `<button class="icon" data-act="relic" data-i="${i}" `+
-    `title="${esc(r.name)} — ${esc(r.desc)}" aria-label="${esc(r.name)}: ${esc(r.desc)}">`+
+    `<button class="icon" data-act="relic" data-i="${i}"`+
+    tipAttrs(r.name, r.desc) + ` aria-label="${esc(r.name)}: ${esc(r.desc)}">`+
     `${RELIC_ICON[r.name] || "◈"}</button>`).join("");
   $("#s-potions").innerHTML = p.potions.map((q,i) =>
-    `<button class="icon potion" data-act="potion" data-i="${i}" `+
-    `title="${esc(q.name)} — ${esc(q.desc)}" aria-label="${esc(q.name)}: ${esc(q.desc)}">`+
+    `<button class="icon potion" data-act="potion" data-i="${i}"`+
+    tipAttrs(q.name, q.desc) + ` aria-label="${esc(q.name)}: ${esc(q.desc)}">`+
     `${POTION_ICON[q.name] || "🧪"}`+
     `<span class="key" aria-hidden="true">${POTION_KEYS[i] || ""}</span></button>`).join("");
 }
@@ -189,7 +230,11 @@ function renderMap(st){
   const isBoss = f => f === m.floors.length-1;
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
     <defs>
-      <filter id="glow" x="-70%" y="-70%" width="240%" height="240%">
+      <!-- userSpaceOnUse, because a percentage filter region is a percentage of
+           the bounding box: a perfectly vertical edge has zero width, so its
+           glow region collapsed and the line vanished entirely. -->
+      <filter id="glow" filterUnits="userSpaceOnUse"
+              x="0" y="0" width="${W}" height="${H}">
         <feGaussianBlur stdDeviation="3.4" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
@@ -208,16 +253,28 @@ function renderMap(st){
     svg += `<text x="8" y="${y(f)+4}" font-size="10" fill="#4a4260"
              font-family="Georgia,serif">${f+1}</text>`;
   });
+  /* Unexplored edges used to be #332c47 at .6 opacity on a near-black
+     background — you could not trace where a path went. Every edge now gets a
+     dark casing underneath so it reads against the mottled backdrop, and the
+     three states are separated by brightness and dash rather than by opacity. */
+  const EDGE = {
+    done: {stroke:"#e6bd6c", width:3,   dash:"",     glow:true},
+    open: {stroke:"#c0a8f0", width:2.8, dash:"8 5",  glow:true},
+    far:  {stroke:"#6b5f92", width:2,   dash:"5 5",  glow:false},
+  };
   for(let f=0; f<m.floors.length-1; f++)
     m.floors[f].forEach((n,i) => n.edges.forEach(t => {
       const done = m.visited.some(v=>v[0]===f&&v[1]===i) &&
                    m.visited.some(v=>v[0]===f+1&&v[1]===t);
       const open = f === m.cur_floor && i === m.cur_idx && m.reachable.includes(t);
-      svg += `<line x1="${x(f,i)}" y1="${y(f)}" x2="${x(f+1,t)}" y2="${y(f+1)}"
-               stroke="${done ? "#c79a4e" : (open ? "#8d7bb0" : "#332c47")}"
-               stroke-width="${done ? 2.4 : (open ? 2 : 1.4)}" stroke-linecap="round"
-               opacity="${done ? .95 : (open ? .85 : .6)}"
-               ${done ? 'filter="url(#glow)"' : `stroke-dasharray="${open ? "6 5" : "3 6"}"`}/>`;
+      const e = EDGE[done ? "done" : (open ? "open" : "far")];
+      const ends = `x1="${x(f,i)}" y1="${y(f)}" x2="${x(f+1,t)}" y2="${y(f+1)}"`;
+      svg += `<line ${ends} stroke="#0b0812" stroke-width="${e.width + 2.5}"
+                stroke-linecap="round" opacity=".85"/>`
+          +  `<line ${ends} stroke="${e.stroke}" stroke-width="${e.width}"
+                stroke-linecap="round"
+                ${e.dash ? `stroke-dasharray="${e.dash}"` : ""}
+                ${e.glow ? 'filter="url(#glow)"' : ""}/>`;
     }));
   m.floors.forEach((row,f) => row.forEach((n,i) => {
     const k = NODE[n.type], cur = (f===m.cur_floor && i===m.cur_idx);
@@ -292,6 +349,7 @@ function renderCombat(st){
       d.setAttribute("aria-label", `${e.name}, ${hp}` +
         (it ? `, intent ${it.kind}${it.kind==="attack"?` ${it.dmg} damage`:""}` : ""));
       d.addEventListener("keydown", ev => {
+        if(ev.target !== d) return;   // a focused status chip is not a target pick
         if(ev.key === "Enter" || ev.key === " "){ ev.preventDefault(); clickFoe(i); }
       });
     }
@@ -371,19 +429,63 @@ function clickFoe(i){
 }
 
 /* ── other screens ──────────────────────────────────────── */
+/* Rewards used to be granted the instant the last enemy died and reported as
+   one run-on sentence. Each one is now a row you take or leave, and the screen
+   stays put until you say you are done. */
+const REWARD_TITLE = {monster:"Victory", elite:"Elite slain", boss:"Boss slain"};
+
+function rewardRow(icon, name, desc, opts){
+  const row = el("div","item reward-row");
+  row.innerHTML = `<span class="rico" aria-hidden="true">${icon}</span>` +
+    `<span class="nm">${esc(name)}</span><span class="ds">${esc(desc)}</span>`;
+  if(opts.taken){
+    row.appendChild(el("span","ghost taken","Taken"));
+    row.classList.add("done");
+    return row;
+  }
+  const b = el("button","buy", `Take <kbd>${opts.kbd}</kbd>`);
+  b.onclick = opts.onclick;
+  if(opts.blocked){ b.disabled = true; b.title = opts.blocked; }
+  row.appendChild(b);
+  return row;
+}
+
 function renderReward(st){
   const r = S.reward;
-  st.appendChild(el("h2","title","Victory"));
-  let sub = `You find ${r.gold} gold.`;
-  if(r.relic) sub += `  Relic: ${r.relic.name} — ${r.relic.desc}`;
-  if(r.potion) sub += `  Potion: ${r.potion.name}.`;
-  st.appendChild(el("div","sub", esc(sub)));
-  st.appendChild(el("div","center ghost","Choose a card to add to your deck"));
-  const row = el("div","row"); row.style.marginTop = "16px";
-  r.cards.forEach((c,i) => row.appendChild(cardEl(c,{kbd:i+1,
-    onclick:()=>send({type:"reward", idx:i})})));
-  st.appendChild(row);
-  st.appendChild(ctaButton("Skip <kbd>S</kbd>", ()=> send({type:"reward", idx:null})));
+  st.appendChild(el("h2","title", REWARD_TITLE[r.kind] || "Victory"));
+  if(r.log && r.log.length){
+    st.appendChild(el("div","combatlog", r.log.map(esc).join("<br>")));
+  }
+  st.appendChild(el("div","sub", `You find ${r.gold} gold.`));
+
+  const items = el("div","rewards");
+  if(r.relic){
+    items.appendChild(rewardRow(RELIC_ICON[r.relic.name] || "◈", r.relic.name,
+      r.relic.desc, {kbd:"R", taken:r.relic_taken,
+                     onclick:()=>send({type:"reward", what:"relic"})}));
+  }
+  if(r.potion){
+    items.appendChild(rewardRow(POTION_ICON[r.potion.name] || "🧪", r.potion.name,
+      r.potion.desc, {kbd:"P", taken:r.potion_taken,
+                      blocked: r.potions_full ? "Your potion slots are full" : null,
+                      onclick:()=>send({type:"reward", what:"potion"})}));
+  }
+  if(items.children.length) st.appendChild(items);
+
+  if(r.card_taken){
+    st.appendChild(el("div","center ghost","Card added to your deck."));
+  }else{
+    st.appendChild(el("div","center ghost","Choose one card to add to your deck"));
+    const row = el("div","row"); row.style.marginTop = "16px";
+    r.cards.forEach((c,i) => row.appendChild(cardEl(c,{kbd:i+1,
+      onclick:()=>send({type:"reward", what:"card", idx:i})})));
+    st.appendChild(row);
+  }
+  const left = (r.relic && !r.relic_taken)
+            || (r.potion && !r.potion_taken && !r.potions_full)
+            || !r.card_taken;
+  st.appendChild(ctaButton((left ? "Leave the rest" : "Continue") + " <kbd>Enter</kbd>",
+                           ()=> send({type:"reward_done"}), left ? "tbtn" : "cta"));
 }
 
 function renderChoose(st){
@@ -457,7 +559,9 @@ function renderEvent(st){
   if(ev.result === null){
     const box = el("div","choices");
     ev.options.forEach((o,i) => {
-      const b = el("button","choice",`<span class="k">${i+1}</span> ${esc(o)}`);
+      // the label is flavour; the preview is what the choice actually costs
+      const b = el("button","choice",`<span class="k">${i+1}</span> ${esc(o.label)}` +
+        (o.preview ? `<span class="preview">${esc(o.preview)}</span>` : ""));
       b.onclick = ()=> send({type:"event_choose", idx:i});
       box.appendChild(b);
     });
@@ -542,6 +646,7 @@ function openOverlay(title, cards, note){
   showOverlay();
 }
 function showOverlay(){
+  hideTip();
   overlayReturn = overlayOpen() ? overlayReturn : document.activeElement;
   $("#overlay").classList.add("on");
   $("#overlay .close").focus();
@@ -587,12 +692,9 @@ function showHelp(){
       <p>Targeted cards ask you to click an enemy (or press <kbd>a</kbd>–<kbd>d</kbd>).
          Potions are the chips in the top-right: click them or press
          <kbd>q</kbd> <kbd>w</kbd> <kbd>r</kbd>.</p>
-      <p><span style="color:#d98cc9">Vulnerable</span> takes 50% more attack damage ·
-         <span style="color:#7fb6e0">Weak</span> deals 25% less ·
-         <span style="color:#7fb6e0">Frail</span> gains 25% less Block ·
-         <span style="color:#e08a7a">Strength</span> adds damage ·
-         <span style="color:#8fd08f">Dexterity</span> adds Block ·
-         <span style="color:#8fd08f">Poison</span> drains HP each turn.</p>
+      <p>The small chips on you and on each enemy are <b>statuses</b>. Hover one —
+         or tap it on a phone — and it will tell you exactly what it does. Relics
+         and potions in the top bar work the same way.</p>
       <p class="ghost">Keys: <kbd>1</kbd>–<kbd>9</kbd> cards or options ·
         <kbd>E</kbd> end turn · <kbd>a</kbd>–<kbd>d</kbd> target / path ·
         <kbd>i</kbd> deck · <kbd>Esc</kbd> cancel · <kbd>Enter</kbd> continue</p>
@@ -661,10 +763,22 @@ const SCREENS = {
   },
   reward: {
     render: renderReward,
-    hint: "1–3 take a card · s skip",
+    hint: () => {
+      const r = S.reward;
+      return [!r.card_taken ? "1–3 take a card" : null,
+              r.relic && !r.relic_taken ? "r relic" : null,
+              r.potion && !r.potion_taken && !r.potions_full ? "p potion" : null,
+              "enter continue"].filter(Boolean).join(" · ");
+    },
     keys: (k, num) => {
-      if(k === "s"){ send({type:"reward", idx:null}); return; }
-      if(num >= 0 && num < S.reward.cards.length) send({type:"reward", idx:num});
+      const r = S.reward;
+      if(k === "enter" || k === "s"){ send({type:"reward_done"}); return; }
+      if(k === "r" && r.relic && !r.relic_taken){
+        send({type:"reward", what:"relic"}); return; }
+      if(k === "p" && r.potion && !r.potion_taken && !r.potions_full){
+        send({type:"reward", what:"potion"}); return; }
+      if(!r.card_taken && num >= 0 && num < r.cards.length)
+        send({type:"reward", what:"card", idx:num});
     },
   },
   choose: {
@@ -727,6 +841,7 @@ function combatKeys(k, num, ev){
 
 /* ── main render ────────────────────────────────────────── */
 function render(){
+  hideTip();                 // whatever it was anchored to is about to be replaced
   renderTop();
   const st = $("#stage"); st.innerHTML = "";
   const changed = S.screen !== lastScreen;
@@ -811,6 +926,38 @@ document.addEventListener("click", ev => {
     case "reconnect":     reconnect(); break;
   }
 });
+
+/* ── tooltip wiring ──────────────────────────────────────
+   Delegated, so anything rendered with data-tip picks it up without knowing
+   the tooltip exists. */
+document.addEventListener("mouseover", ev => {
+  const node = ev.target.closest("[data-tip]");
+  if(node === tipFor) return;
+  hideTip();
+  if(node) showTip(node);
+});
+document.addEventListener("mouseout", ev => {
+  if(tipFor && !tipFor.contains(ev.relatedTarget)) hideTip();
+});
+document.addEventListener("focusin", ev => {
+  const node = ev.target.closest("[data-tip]");
+  hideTip();
+  if(node) showTip(node);
+});
+document.addEventListener("focusout", hideTip);
+// Touch has no hover: tap a chip to pin its tooltip, tap elsewhere to drop it.
+// Relics and potions are left out — they already open the overlay on tap. A tap
+// on a chip already focused it, so re-showing here would only make it flicker.
+// Capture phase, because an enemy's chips sit inside the enemy: tapping one to
+// read it must not also pick that enemy as a target.
+document.addEventListener("click", ev => {
+  const node = ev.target.closest("[data-tip]:not([data-act])");
+  if(!node){ hideTip(); return; }
+  if(node !== tipFor) showTip(node);
+  ev.stopPropagation();
+}, true);
+window.addEventListener("scroll", hideTip, true);
+window.addEventListener("resize", hideTip);
 
 async function reconnect(){
   setOffline(false);
