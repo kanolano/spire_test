@@ -13,6 +13,7 @@
  */
 
 import { send } from "../actions";
+import { heroSvg } from "../art/heroes";
 import * as art from "../art/registry";
 import { el, esc, LETTERS, tipAttrs } from "../dom";
 import { S, sel, setSel } from "../store";
@@ -58,6 +59,11 @@ interface Scene {
   endturn: HTMLButtonElement;
   hand: HTMLElement;
   cards: Map<number, HTMLElement>;
+  /** The player's body on the field — what the director lunges and shakes. */
+  hero: HTMLElement;
+  heroBody: HTMLElement;
+  heroPlate: HTMLElement;
+  heroChips: HTMLElement;
 }
 
 let scene: Scene | null = null;
@@ -86,6 +92,23 @@ export function mountCombat(stage: HTMLElement) {
 
   const head = el("div", "sub");
   stage.appendChild(head);
+
+  // The player used to be a status bar being attacked by a row of monsters.
+  // Putting a body on the field opposite them is what makes a swing legible as
+  // one thing hitting another.
+  const field = el("div");
+  field.id = "field";
+  const hero = el("div", "hero-side");
+  const heroBody = el("div", "foe-body");
+  const heroPose = el("div", "foe-pose");
+  const heroSprite = el("div", "sprite");
+  heroSprite.innerHTML = heroSvg(state.player.cls);
+  heroPose.appendChild(heroSprite);
+  heroBody.appendChild(heroPose);
+  const heroPlate = el("div", "hero-plate");
+  const heroChips = el("div", "chips foe-chips");
+  hero.append(heroBody, el("div", "shadow"), heroPlate, heroChips);
+  field.appendChild(hero);
 
   const foesWrap = el("div");
   foesWrap.id = "enemies";
@@ -124,7 +147,8 @@ export function mountCombat(stage: HTMLElement) {
     foesWrap.appendChild(root);
     return { root, intent, sprite, body, name, barFill, barNum, chips };
   });
-  stage.appendChild(foesWrap);
+  field.appendChild(foesWrap);
+  stage.appendChild(field);
 
   const bar = el("div");
   bar.id = "playerbar";
@@ -157,6 +181,7 @@ export function mountCombat(stage: HTMLElement) {
   scene = {
     stage, head, foes, bar, log, orb, pname, hpFill, hpText,
     piles, endturn, hand, cards: new Map(),
+    hero, heroBody, heroPlate, heroChips,
   };
   updateCombat();
 }
@@ -183,6 +208,13 @@ export function updateCombat(state: State = S()) {
     const n = scene!.foes[i];
     if (n) updateFoe(n, e, i, Boolean(s && s.mode === "target" && e.alive));
   });
+
+  // The player's own block and statuses belong next to the player's body, not
+  // buried in the stats bar.
+  scene.heroPlate.innerHTML = p.block
+    ? `<span class="block-badge">🛡 ${p.block}</span>` : "";
+  scene.heroChips.innerHTML = p.statuses.map(statusChip).join("");
+  scene.hero.dataset.low = String(p.hp / p.max_hp < 0.35);
 
   scene.log.innerHTML = cb.log.slice(-3).map((l) => `<div>${esc(l)}</div>`).join("");
   scene.orb.innerHTML =

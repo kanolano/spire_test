@@ -110,9 +110,10 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       // index the engine reports, so it can be flown out of it.
       const card = scene.hand.children[ev.idx] as HTMLElement | undefined;
       if (!card) break;
-      const target = ev.target == null ? scene.foes[0]?.root : scene.foes[ev.target]?.root;
+      // An untargeted card (a Defend, a Power) resolves on the player.
+      const target = ev.target == null ? scene.hero : scene.foes[ev.target]?.root;
       const from = card.getBoundingClientRect();
-      const to = (target ?? scene.bar).getBoundingClientRect();
+      const to = (target ?? scene.hero).getBoundingClientRect();
       tl.to(card, {
         duration: d(BEAT.play) * 0.4, y: -34, scale: 1.06, ease: "power2.out",
       }).to(card, {
@@ -262,13 +263,13 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
 function node(who: Who): HTMLElement | null {
   const scene = combatScene();
   if (!scene) return null;
-  return who === "player" ? scene.bar : (scene.foes[who]?.body ?? null);
+  return who === "player" ? scene.heroBody : (scene.foes[who]?.body ?? null);
 }
 
 function hitTarget(who: Who): { body: HTMLElement; box: HTMLElement } | null {
   const scene = combatScene();
   if (!scene) return null;
-  if (who === "player") return { body: scene.bar, box: scene.bar };
+  if (who === "player") return { body: scene.heroBody, box: scene.hero };
   const foe = scene.foes[who];
   return foe ? { body: foe.body, box: foe.root } : null;
 }
