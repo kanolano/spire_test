@@ -45,6 +45,9 @@ export interface FoeNodes {
   chips: HTMLElement;
 }
 
+/** A hand card: the slot holds its place in the fan, the card is the face. */
+export interface HeldCard { slot: HTMLElement; card: HTMLElement }
+
 interface Scene {
   stage: HTMLElement;
   head: HTMLElement;
@@ -58,7 +61,7 @@ interface Scene {
   piles: HTMLElement;
   endturn: HTMLButtonElement;
   hand: HTMLElement;
-  cards: Map<number, HTMLElement>;
+  cards: Map<number, HeldCard>;
   /** The player's body on the field — what the director lunges and shakes. */
   hero: HTMLElement;
   heroBody: HTMLElement;
@@ -70,7 +73,7 @@ let scene: Scene | null = null;
 
 export const combatScene = () => scene;
 export const foeNode = (i: number) => scene?.foes[i]?.root ?? null;
-export const cardNode = (uid: number) => scene?.cards.get(uid) ?? null;
+export const cardNode = (uid: number) => scene?.cards.get(uid)?.card ?? null;
 
 /** Called when leaving combat, so the next fight builds a fresh scene. */
 export function unmountCombat() {
@@ -283,16 +286,23 @@ function updateFoe(n: FoeNodes, e: EnemyView, i: number, targetable: boolean) {
       : ""));
 }
 
-/** Keep hand DOM keyed by uid, so a card that stays in hand keeps its node —
- *  and its position — across an update. */
+/**
+ * Keep hand DOM keyed by uid, so a card that stays in hand keeps its node —
+ * and its position — across an update.
+ *
+ * Each card lives in a slot. The slot carries the fan transform and the card
+ * carries hover and selection, because one element cannot hold both: the
+ * hover rule would overwrite the arc and cards would snap flat under the
+ * cursor.
+ */
 function syncHand(hand: CardView[], s: ReturnType<typeof sel>) {
   if (!scene) return;
   const wanted = new Set(hand.map((c) => c.uid));
-  for (const [uid, node] of scene.cards) {
-    if (!wanted.has(uid)) { node.remove(); scene.cards.delete(uid); }
+  for (const [uid, held] of scene.cards) {
+    if (!wanted.has(uid)) { held.slot.remove(); scene.cards.delete(uid); }
   }
   hand.forEach((c, i) => {
-    let node = scene!.cards.get(c.uid);
+    let held = scene!.cards.get(c.uid);
     const opts = {
       combat: true,
       kbd: (i + 1) % 10,
@@ -300,20 +310,49 @@ function syncHand(hand: CardView[], s: ReturnType<typeof sel>) {
       pick: Boolean(s && s.mode === "hand" && i !== s.idx),
       onclick: () => clickCard(i),
     };
-    if (!node) {
-      node = cardEl(c, opts);
-      scene!.cards.set(c.uid, node);
+    if (!held) {
+      const card = cardEl(c, opts);
+      const slot = el("div", "slot");
+      slot.appendChild(card);
+      held = { slot, card };
+      scene!.cards.set(c.uid, held);
     } else {
       // Cheap enough to rebuild the face; the *node* is what has to persist.
       const fresh = cardEl(c, opts);
-      node.className = fresh.className;
-      node.innerHTML = fresh.innerHTML;
-      node.onclick = opts.onclick;
-      node.setAttribute("aria-label", fresh.getAttribute("aria-label")!);
+      held.card.className = fresh.className;
+      held.card.innerHTML = fresh.innerHTML;
+      held.card.onclick = opts.onclick;
+      held.card.setAttribute("aria-label", fresh.getAttribute("aria-label")!);
     }
-    if (scene!.hand.children[i] !== node) {
-      scene!.hand.insertBefore(node, scene!.hand.children[i] ?? null);
+    held.slot.dataset.idx = String(i);
+    held.card.dataset.idx = String(i);
+    if (scene!.hand.children[i] !== held.slot) {
+      scene!.hand.insertBefore(held.slot, scene!.hand.children[i] ?? null);
     }
+  });
+  fanHand(hand.length);
+}
+
+/**
+ * Lay the hand out as an arc rather than a flat row.
+ *
+ * Done in JS because it depends on how many cards there are: a hand of two
+ * should be almost flat and a hand of nine should curve hard, which a static
+ * stylesheet cannot express.
+ */
+function fanHand(n: number) {
+  if (!scene) return;
+  const mid = (n - 1) / 2;
+  // Tighten the spread as the hand grows, or ten cards fan off the screen.
+  const step = Math.min(4.2, 26 / Math.max(1, n));
+  [...scene.cards.values()].forEach((held) => {
+    const i = Number(held.slot.dataset.idx);
+    const off = i - mid;
+    const rot = off * step;
+    const lift = Math.abs(off) ** 2 * (n > 3 ? 2.6 : 0);
+    held.slot.style.transform = `rotate(${rot.toFixed(2)}deg) translateY(${lift.toFixed(1)}px)`;
+    // Later cards overlap earlier ones, and a hovered card must win.
+    held.slot.style.zIndex = String(10 + i);
   });
 }
 

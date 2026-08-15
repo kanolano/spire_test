@@ -191,6 +191,20 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
   border:1px solid transparent;transition:border-color .12s,background .12s}
 .foe.dead{opacity:.25;filter:grayscale(1)}
 .foe.targetable{cursor:crosshair;border-color:var(--gold);background:rgba(224,185,120,.06)}
+/* The enemy the pointer is actually over, mid-drag. */
+.foe.droptarget{border-color:var(--gold);background:rgba(224,185,120,.16);
+  box-shadow:0 0 0 1px var(--gold),0 0 22px rgba(224,185,120,.25)}
+.foe.droptarget .foe-pose{transform:translateY(-4px) scale(1.06)}
+
+/* ── drag to play ────────────────────────────────────────── */
+body.dragging{cursor:grabbing}
+body.dragging #hand .slot:hover{transform:none !important}
+#hand .slot.held{z-index:80 !important;transition:none}
+#hand .slot.held .card{box-shadow:0 18px 34px rgba(0,0,0,.6);cursor:grabbing;
+  opacity:.92}
+#dragarc{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:70;
+  opacity:.55}
+#dragarc.live{opacity:1;filter:drop-shadow(0 0 6px rgba(224,185,120,.5))}
 /* The idle bob lives on .sprite and directed motion (lunge, recoil, death)
    lives on .foe-body, so the two never fight over one transform. */
 .foe-body{will-change:transform,filter}
@@ -261,8 +275,15 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
   white-space:nowrap}
 .piles button:hover{color:var(--gold);border-color:var(--gold)}
 
-#hand{display:flex;gap:13px;justify-content:center;align-items:flex-end;padding:14px 0 2px;
-  flex-wrap:wrap}
+/* The hand is an arc. The slot holds the card's place in it; the card itself
+   keeps hover and selection, so the two never overwrite each other. */
+#hand{display:flex;justify-content:center;align-items:flex-end;padding:22px 0 2px;
+  flex-wrap:wrap;perspective:900px}
+#hand .slot{transform-origin:50% 130%;transition:transform .22s ease;
+  margin:0 -6px;flex:0 0 auto}
+#hand .slot:hover{z-index:60 !important}
+/* Hovering lifts the card and straightens it out of the fan so it is legible. */
+#hand .slot:hover,#hand .slot:focus-within{transform:translateY(-14px) rotate(0deg) !important}
 #endturn{padding:11px 22px;border-radius:var(--r);font-family:var(--display);font-size:15px;
   letter-spacing:.07em;color:#ffe0d8;background:linear-gradient(#793226,#471b14);
   border:1px solid #a8442f;white-space:nowrap;transition:.12s}

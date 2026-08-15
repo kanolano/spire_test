@@ -4,6 +4,7 @@ import { boot } from "./actions";
 import { mountArtDefs } from "./art/defs";
 import { artSheetRequested, renderArtSheet } from "./art/sheet";
 import { reducedMotion } from "./director";
+import { wireDrag } from "./drag";
 import { wireInput } from "./input";
 import { render } from "./render";
 import { onRender } from "./store";
@@ -19,5 +20,6 @@ if (artSheetRequested()) {
   onRender(render);
   wireTooltips();
   wireInput();
+  wireDrag();
   void boot();
 }

@@ -110,10 +110,12 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       // index the engine reports, so it can be flown out of it.
       const card = scene.hand.children[ev.idx] as HTMLElement | undefined;
       if (!card) break;
+      card.style.zIndex = "90";     // over its neighbours while it travels
       // An untargeted card (a Defend, a Power) resolves on the player.
       const target = ev.target == null ? scene.hero : scene.foes[ev.target]?.root;
       const from = card.getBoundingClientRect();
       const to = (target ?? scene.hero).getBoundingClientRect();
+      if (ev.cost > 0) tl.call(() => pulseOrb());
       tl.to(card, {
         duration: d(BEAT.play) * 0.4, y: -34, scale: 1.06, ease: "power2.out",
       }).to(card, {
@@ -174,6 +176,17 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
         x: "-=9", filter: "brightness(1)", ease: "elastic.out(1, 0.45)",
       });
       if (ev.amount > 0) rig(target.body, ".rig-eye", tl, d(BEAT.damage), { scale: 1.5 });
+      // Block that absorbed a blow and then ran out is worth showing breaking,
+      // not silently disappearing.
+      if (ev.blocked > 0 && ev.block === 0) {
+        const badge = target.box.querySelector(".block-badge");
+        if (badge) {
+          tl.to(badge, {
+            duration: d(BEAT.block), scale: 1.3, opacity: 0, rotate: -12,
+            ease: "power2.in",
+          }, "<");
+        }
+      }
       if (ev.who === "player" && ev.amount > 0) {
         const hurt = ev.amount / Math.max(1, after.player.max_hp);
         tl.to($("#stage"), {
@@ -339,6 +352,15 @@ function setBlock(who: Who, block: number, after: State) {
 const escapeName = (s: string) =>
   s.replace(/[<>&"']/g, (m) => (
     { "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" }[m]!));
+
+/** The orb is where energy is spent, so spending should be visible there. */
+function pulseOrb() {
+  const orb = combatScene()?.orb;
+  if (!orb) return;
+  gsap.fromTo(orb,
+    { scale: 1.14, filter: "brightness(1.7)" },
+    { duration: 0.32, scale: 1, filter: "brightness(1)", ease: "power2.out" });
+}
 
 function pushLog(text: string) {
   const scene = combatScene();
