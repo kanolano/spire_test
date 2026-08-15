@@ -51,15 +51,20 @@ export function toast(message: string, kind?: string) {
   setTimeout(() => node.remove(), 4200);
 }
 
-let busy = false;
+let busyDepth = 0;
 let offline = false;
 
-export const isBusy = () => busy;
+export const isBusy = () => busyDepth > 0;
 export const isOffline = () => offline;
 
+/**
+ * Counted, not a flag. A request and the animation of its result overlap: the
+ * request releases the lock in its `finally`, which lands while the timeline
+ * is still playing. As a boolean that unlocked input mid-turn.
+ */
 export function setBusy(on: boolean) {
-  busy = on;
-  document.body.classList.toggle("busy", on);
+  busyDepth = Math.max(0, busyDepth + (on ? 1 : -1));
+  document.body.classList.toggle("busy", busyDepth > 0);
 }
 
 export function setOffline(on: boolean, message?: string) {

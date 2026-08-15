@@ -4,9 +4,11 @@
  * in sync by hand.
  */
 
+import { play as playFx } from "./director";
 import { $, el, esc } from "./dom";
-import { floaters } from "./fx";
-import { combatHint, combatKeys, renderCombat } from "./screens/combat";
+import {
+  combatHint, combatKeys, mountCombat, unmountCombat, updateCombat,
+} from "./screens/combat";
 import {
   eventKeys, renderEvent, renderTreasure, treasureKeys,
 } from "./screens/event";
@@ -17,7 +19,9 @@ import {
 } from "./screens/reward";
 import { renderShop, shopKeys } from "./screens/shop";
 import { renderRest, restKeys } from "./screens/rest";
-import { lastScreen, S, setLastScreen, setLastTurn } from "./store";
+import {
+  lastScreen, pendingFx, prev, S, setLastScreen, setPendingFx,
+} from "./store";
 import type { Screen } from "./types";
 import { hideTip } from "./ui/tooltip";
 import { renderTop } from "./ui/topbar";
@@ -40,7 +44,7 @@ export const SCREENS: Record<Screen, ScreenDef> = {
     keys: mapKeys,
   },
   combat: {
-    render: renderCombat,
+    render: mountCombat,
     hint: combatHint,
     keys: combatKeys,
   },
@@ -91,11 +95,28 @@ export function render() {
   renderTop();
   const state = S();
   const st = $("#stage");
+  const staying = state.screen === "combat" && lastScreen === "combat";
+  const animate = pendingFx;
+  setPendingFx(false);
+
+  // Combat is the one screen that survives a state change. Everything else is
+  // still cheapest to rebuild, and none of it needs node identity.
+  if (staying) {
+    hint();
+    // The director starts from the previous snapshot and reconciles to this
+    // one; on a re-render with nothing new to show (cancelling a selection)
+    // it just updates.
+    if (animate) playFx(prev(), state, state.fx ?? []);
+    else updateCombat(state);
+    announceCombat();
+    return;
+  }
+
+  if (lastScreen === "combat") unmountCombat();
   st.innerHTML = "";
   const changed = state.screen !== lastScreen;
   st.className = "screen-" + state.screen;
   if (changed) { void st.offsetWidth; st.classList.add("enter"); }  // fade only between screens
-  if (state.screen !== "combat") setLastTurn(-1);
   setLastScreen(state.screen);
 
   if (state.banner) {
@@ -109,7 +130,6 @@ export function render() {
   else st.appendChild(el("div", "center", "…"));
 
   hint();
-  floaters();
   announceCombat();
 }
 

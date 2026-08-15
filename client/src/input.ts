@@ -5,6 +5,7 @@
  */
 
 import { reconnect, send } from "./actions";
+import { isPlaying, skip } from "./director";
 import { isOffline } from "./net";
 import { SCREENS } from "./render";
 import { clickPotion } from "./screens/combat";
@@ -18,6 +19,10 @@ export function wireInput() {
   document.addEventListener("keydown", (ev) => {
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
     const k = ev.key.toLowerCase();
+
+    // Impatience is the common case on a replayed turn: the first keypress
+    // fast-forwards rather than queueing behind the animation.
+    if (isPlaying() && !overlayOpen()) { ev.preventDefault(); skip(); return; }
 
     if (overlayOpen()) {
       // "1" confirms; Enter deliberately does not, so a stray keypress on the
@@ -47,6 +52,7 @@ export function wireInput() {
   });
 
   document.addEventListener("click", (ev) => {
+    if (isPlaying() && !overlayOpen()) { skip(); return; }
     const target = (ev.target as Element | null)?.closest<HTMLElement>("[data-act]");
     if (!target) return;
     const i = Number(target.dataset.i);

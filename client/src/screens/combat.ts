@@ -1,8 +1,22 @@
+/**
+ * The combat screen, which — unlike every other screen — is not rebuilt on
+ * each state change.
+ *
+ * `render()` used to do `stage.innerHTML = ""` unconditionally, so nothing
+ * survived long enough to animate: a card could not fly anywhere because the
+ * card that would have flown had already been destroyed. Combat now mounts
+ * once and reconciles, keying enemies by index (they never reorder — dead ones
+ * stay in place) and hand cards by their per-instance uid.
+ *
+ * Direct DOM handles are kept in `scene` so the director can drive individual
+ * parts of it mid-timeline without a lookup or a re-render.
+ */
+
 import { send } from "../actions";
 import * as art from "../art/registry";
-import { $, el, esc, LETTERS, tipAttrs } from "../dom";
-import { S, render, lastTurn, sel, setLastTurn, setSel } from "../store";
-import type { IntentKind, IntentView } from "../types";
+import { el, esc, LETTERS, tipAttrs } from "../dom";
+import { S, sel, setSel } from "../store";
+import type { CardView, EnemyView, IntentKind, IntentView, State } from "../types";
 import { cardEl } from "../ui/card";
 import { statusChip } from "../ui/chips";
 import { POTION_KEYS } from "../ui/topbar";
@@ -19,101 +33,246 @@ const KIND_TIP: Record<IntentKind, string> = {
   debuff: "It will weaken you.",
 };
 
-function intentBadge(it: IntentView): string {
-  const body = it.kind === "attack"
+export interface FoeNodes {
+  root: HTMLElement;
+  intent: HTMLElement;
+  sprite: HTMLElement;
+  body: HTMLElement;
+  name: HTMLElement;
+  barFill: HTMLElement;
+  barNum: HTMLElement;
+  chips: HTMLElement;
+}
+
+interface Scene {
+  stage: HTMLElement;
+  head: HTMLElement;
+  foes: FoeNodes[];
+  bar: HTMLElement;
+  log: HTMLElement;
+  orb: HTMLElement;
+  pname: HTMLElement;
+  hpFill: HTMLElement;
+  hpText: HTMLElement;
+  piles: HTMLElement;
+  endturn: HTMLButtonElement;
+  hand: HTMLElement;
+  cards: Map<number, HTMLElement>;
+}
+
+let scene: Scene | null = null;
+
+export const combatScene = () => scene;
+export const foeNode = (i: number) => scene?.foes[i]?.root ?? null;
+export const cardNode = (uid: number) => scene?.cards.get(uid) ?? null;
+
+/** Called when leaving combat, so the next fight builds a fresh scene. */
+export function unmountCombat() {
+  scene = null;
+}
+
+function intentHtml(it: IntentView): string {
+  return it.kind === "attack"
     ? `${GLYPH.attack} ${it.dmg}${(it.hits ?? 1) > 1 ? ` × ${it.hits}` : ""}`
       + `${it.extra ? " +" : ""}`
     : `${GLYPH[it.kind] || "●"} ${esc(it.name)}`;
-  return `<div class="intent ${it.kind}"`
-    + tipAttrs(it.name, it.note || KIND_TIP[it.kind] || "") + `>${body}</div>`;
 }
 
-export function renderCombat(st: HTMLElement) {
+/* ── mount ─────────────────────────────────────────────────── */
+
+export function mountCombat(stage: HTMLElement) {
   const state = S();
   const cb = state.combat!;
-  const p = state.player;
-  const s = sel();
 
-  st.appendChild(el("div", "sub", `${esc(cb.label)} &nbsp;·&nbsp; turn ${cb.turn}`));
+  const head = el("div", "sub");
+  stage.appendChild(head);
 
-  const foes = el("div");
-  foes.id = "enemies";
-  cb.enemies.forEach((e, i) => {
-    const targetable = s && s.mode === "target" && e.alive;
-    const d = el("div", "foe" + (e.alive ? "" : " dead") + (targetable ? " targetable" : ""));
-    d.dataset.foe = String(i);
-    d.innerHTML =
-      (e.alive && e.intent ? intentBadge(e.intent)
-        : e.alive ? "" : "<div class='intent'>slain</div>") +
-      `<div class="sprite">${art.creature(e.key)}</div><div class="shadow"></div>` +
-      `<div class="fname">${e.alive ? `<span style="color:var(--gold)">${LETTERS[i]}</span> · ` : ""}`
-        + `${esc(e.name)}${e.block ? `<span class="block-badge">🛡 ${e.block}</span>` : ""}</div>` +
-      `<div class="fbar"><i style="width:${Math.max(0, e.hp) / e.max_hp * 100}%"></i>`
-        + `<span class="fnum">${Math.max(0, e.hp)} / ${e.max_hp}</span></div>` +
-      `<div class="chips" style="justify-content:center;margin-top:6px">`
-        + e.statuses.map(statusChip).join("") + `</div>`;
+  const foesWrap = el("div");
+  foesWrap.id = "enemies";
+  const foes: FoeNodes[] = cb.enemies.map((_e, i) => {
+    const root = el("div", "foe");
+    root.dataset.foe = String(i);
+    const intent = el("div", "intent");
+    // The sprite sits inside a wrapper so idle bob (on .sprite) and directed
+    // motion like a lunge (on .foe-body) never fight over one transform.
+    const body = el("div", "foe-body");
+    const sprite = el("div", "sprite");
+    body.appendChild(sprite);
+    const shadow = el("div", "shadow");
+    const name = el("div", "fname");
+    const bar = el("div", "fbar");
+    const barFill = el("i");
+    const barNum = el("span", "fnum");
+    bar.appendChild(barFill);
+    bar.appendChild(barNum);
+    const chips = el("div", "chips foe-chips");
 
-    if (e.alive) {
-      d.onclick = () => clickFoe(i);
-      d.tabIndex = 0;
-      d.setAttribute("role", "button");
-      const hp = `${Math.max(0, e.hp)} of ${e.max_hp} hit points`;
-      const it = e.intent;
-      d.setAttribute("aria-label", `${e.name}, ${hp}`
-        + (it ? `, intent ${it.kind}${it.kind === "attack" ? ` ${it.dmg} damage` : ""}` : ""));
-      d.addEventListener("keydown", (ev) => {
-        if (ev.target !== d) return;   // a focused status chip is not a target pick
-        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); clickFoe(i); }
-      });
-    }
-    foes.appendChild(d);
+    root.append(intent, body, shadow, name, bar, chips);
+
+    root.tabIndex = 0;
+    root.setAttribute("role", "button");
+    root.onclick = () => clickFoe(i);
+    root.addEventListener("keydown", (ev) => {
+      if (ev.target !== root) return;   // a focused status chip is not a target pick
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); clickFoe(i); }
+    });
+    foesWrap.appendChild(root);
+    return { root, intent, sprite, body, name, barFill, barNum, chips };
   });
-  st.appendChild(foes);
+  stage.appendChild(foesWrap);
 
   const bar = el("div");
   bar.id = "playerbar";
-  bar.innerHTML =
-    `<div class="barlog">${cb.log.slice(-3).map((l) => `<div>${esc(l)}</div>`).join("")}</div>` +
-    `<div class="barmain">
-       <div class="orb">${p.energy}<span style="font-size:12px;opacity:.6">/${p.max_energy}</span></div>
-       <div>
-         <div class="pname">${esc(p.name)}
-           ${p.block ? `<span class="block-badge">🛡 ${p.block}</span>` : ""}</div>
-         <div class="hpwrap" style="width:230px;margin-top:5px">
-           <i class="hpfill" style="width:${Math.max(0, p.hp) / p.max_hp * 100}%"></i>
-           <span class="hptext">${p.hp} / ${p.max_hp}</span></div>
-       </div>
-     </div>`;
+  const log = el("div", "barlog");
+  const main = el("div", "barmain");
+  const orb = el("div", "orb");
+  const pcol = el("div");
+  const pname = el("div", "pname");
+  const hpwrap = el("div", "hpwrap");
+  hpwrap.style.cssText = "width:230px;margin-top:5px";
+  const hpFill = el("i", "hpfill");
+  const hpText = el("span", "hptext");
+  hpwrap.append(hpFill, hpText);
+  pcol.append(pname, hpwrap);
+  main.append(orb, pcol);
 
   const right = el("div", "barright");
-  right.innerHTML =
-    `<div class="piles">
-       <button data-act="pile" data-pile="draw_pile">draw ${cb.draw}</button>
-       <button data-act="pile" data-pile="discard_pile">discard ${cb.discard}</button>
-       <button data-act="pile" data-pile="exhaust_pile">exhaust ${cb.exhaust}</button>
-     </div>`;
-  bar.appendChild(right);
-  st.appendChild(bar);
+  const piles = el("div", "piles");
+  const endturn = el("button");
+  endturn.id = "endturn";
+  right.append(piles, endturn);
+
+  bar.append(log, main, right);
+  stage.appendChild(bar);
 
   const hand = el("div");
   hand.id = "hand";
-  if (cb.turn !== lastTurn) { hand.className = "deal"; setLastTurn(cb.turn); }  // new hand only
-  cb.hand.forEach((c, i) => hand.appendChild(cardEl(c, {
-    combat: true,
-    kbd: (i + 1) % 10,
-    selected: !!s && s.kind === "card" && s.idx === i,
-    pick: !!s && s.mode === "hand" && i !== s.idx,
-    onclick: () => clickCard(i),
-  })));
-  st.appendChild(hand);
+  stage.appendChild(hand);
 
-  const btn = el("button", s ? "cancel" : undefined,
-    s ? "Cancel <kbd>Esc</kbd>" : "End turn <kbd>E</kbd>");
-  btn.id = "endturn";
-  btn.onclick = s
-    ? () => { setSel(null); render(); }
+  scene = {
+    stage, head, foes, bar, log, orb, pname, hpFill, hpText,
+    piles, endturn, hand, cards: new Map(),
+  };
+  updateCombat();
+}
+
+/* ── update ────────────────────────────────────────────────── */
+
+/**
+ * Reconcile the mounted scene against a snapshot.
+ *
+ * Defaults to the live state, but the director passes the *previous* snapshot
+ * first so the timeline starts from what the player was looking at rather than
+ * from the outcome.
+ */
+export function updateCombat(state: State = S()) {
+  if (!scene) return;
+  const cb = state.combat;
+  if (!cb) return;
+  const p = state.player;
+  const s = sel();
+
+  scene.head.innerHTML = `${esc(cb.label)} &nbsp;·&nbsp; turn ${cb.turn}`;
+
+  cb.enemies.forEach((e, i) => {
+    const n = scene!.foes[i];
+    if (n) updateFoe(n, e, i, Boolean(s && s.mode === "target" && e.alive));
+  });
+
+  scene.log.innerHTML = cb.log.slice(-3).map((l) => `<div>${esc(l)}</div>`).join("");
+  scene.orb.innerHTML =
+    `${p.energy}<span style="font-size:12px;opacity:.6">/${p.max_energy}</span>`;
+  scene.pname.innerHTML = esc(p.name)
+    + (p.block ? `<span class="block-badge">🛡 ${p.block}</span>` : "");
+  scene.hpFill.style.width = Math.max(0, p.hp) / p.max_hp * 100 + "%";
+  scene.hpText.textContent = `${p.hp} / ${p.max_hp}`;
+  scene.piles.innerHTML =
+    `<button data-act="pile" data-pile="draw_pile">draw ${cb.draw}</button>`
+    + `<button data-act="pile" data-pile="discard_pile">discard ${cb.discard}</button>`
+    + `<button data-act="pile" data-pile="exhaust_pile">exhaust ${cb.exhaust}</button>`;
+
+  scene.endturn.className = s ? "cancel" : "";
+  scene.endturn.innerHTML = s ? "Cancel <kbd>Esc</kbd>" : "End turn <kbd>E</kbd>";
+  scene.endturn.onclick = s
+    ? () => { setSel(null); updateCombat(); }
     : () => void send({ type: "end_turn" });
-  right.appendChild(btn);
+
+  syncHand(cb.hand, s);
+}
+
+function updateFoe(n: FoeNodes, e: EnemyView, i: number, targetable: boolean) {
+  n.root.classList.toggle("dead", !e.alive);
+  n.root.classList.toggle("targetable", targetable);
+
+  if (e.alive && e.intent) {
+    n.intent.className = "intent " + e.intent.kind;
+    n.intent.innerHTML = intentHtml(e.intent);
+    n.intent.setAttribute("data-tip", e.intent.name);
+    n.intent.setAttribute("data-tip-desc",
+      e.intent.note || KIND_TIP[e.intent.kind] || "");
+    n.intent.hidden = false;
+  } else if (!e.alive) {
+    n.intent.className = "intent";
+    n.intent.textContent = "slain";
+    n.intent.removeAttribute("data-tip");
+    n.intent.hidden = false;
+  } else {
+    n.intent.hidden = true;
+  }
+
+  if (n.sprite.dataset.key !== e.key) {
+    n.sprite.dataset.key = e.key;
+    n.sprite.innerHTML = art.creature(e.key);
+  }
+
+  n.name.innerHTML =
+    (e.alive ? `<span style="color:var(--gold)">${LETTERS[i]}</span> · ` : "")
+    + esc(e.name)
+    + (e.block ? `<span class="block-badge">🛡 ${e.block}</span>` : "");
+  n.barFill.style.width = Math.max(0, e.hp) / e.max_hp * 100 + "%";
+  n.barNum.textContent = `${Math.max(0, e.hp)} / ${e.max_hp}`;
+  n.chips.innerHTML = e.statuses.map(statusChip).join("");
+
+  const hp = `${Math.max(0, e.hp)} of ${e.max_hp} hit points`;
+  n.root.setAttribute("aria-label", `${e.name}, ${hp}`
+    + (e.intent
+      ? `, intent ${e.intent.kind}`
+        + (e.intent.kind === "attack" ? ` ${e.intent.dmg} damage` : "")
+      : ""));
+}
+
+/** Keep hand DOM keyed by uid, so a card that stays in hand keeps its node —
+ *  and its position — across an update. */
+function syncHand(hand: CardView[], s: ReturnType<typeof sel>) {
+  if (!scene) return;
+  const wanted = new Set(hand.map((c) => c.uid));
+  for (const [uid, node] of scene.cards) {
+    if (!wanted.has(uid)) { node.remove(); scene.cards.delete(uid); }
+  }
+  hand.forEach((c, i) => {
+    let node = scene!.cards.get(c.uid);
+    const opts = {
+      combat: true,
+      kbd: (i + 1) % 10,
+      selected: Boolean(s && s.kind === "card" && s.idx === i),
+      pick: Boolean(s && s.mode === "hand" && i !== s.idx),
+      onclick: () => clickCard(i),
+    };
+    if (!node) {
+      node = cardEl(c, opts);
+      scene!.cards.set(c.uid, node);
+    } else {
+      // Cheap enough to rebuild the face; the *node* is what has to persist.
+      const fresh = cardEl(c, opts);
+      node.className = fresh.className;
+      node.innerHTML = fresh.innerHTML;
+      node.onclick = opts.onclick;
+      node.setAttribute("aria-label", fresh.getAttribute("aria-label")!);
+    }
+    if (scene!.hand.children[i] !== node) {
+      scene!.hand.insertBefore(node, scene!.hand.children[i] ?? null);
+    }
+  });
 }
 
 /* ── interaction ───────────────────────────────────────────── */
@@ -135,13 +294,13 @@ export function clickCard(i: number) {
   const alive = living();
   if (c.targeted && alive.length > 1) {
     setSel({ kind: "card", idx: i, mode: "target" });
-    render();
+    updateCombat();
     return;
   }
   const target = c.targeted ? alive[0]! : null;
   if (c.needs_hand && cb.hand.length > 1) {
     setSel({ kind: "card", idx: i, mode: "hand", target });
-    render();
+    updateCombat();
     return;
   }
   void send({ type: "play", idx: i, target, exhaust: null });
@@ -155,7 +314,7 @@ export function clickPotion(i: number) {
   const alive = living();
   if (q.targeted && alive.length > 1) {
     setSel({ kind: "potion", idx: i, mode: "target" });
-    render();
+    updateCombat();
     return;
   }
   void send({ type: "potion", idx: i, target: q.targeted ? alive[0]! : null });
@@ -172,7 +331,7 @@ export function clickFoe(i: number) {
   const c = cb.hand[s.idx];
   if (c?.needs_hand && cb.hand.length > 1) {
     setSel({ ...s, mode: "hand", target: i });
-    render();
+    updateCombat();
     return;
   }
   void send({ type: "play", idx: s.idx, target: i, exhaust: null });
@@ -201,6 +360,6 @@ export const combatHint = () =>
   + `${POTION_KEYS.slice(0, S().player.max_potions).split("").join(" ")} potions · `
   + `esc cancel · i deck`;
 
-/** Used by the fx layer to find a rendered enemy. */
-export const foeNode = (i: number) =>
-  $("#stage").querySelector<HTMLElement>(`.foe[data-foe="${i}"]`);
+/** Kept so the tooltip helper can still build intent attributes. */
+export const intentTip = (it: IntentView) =>
+  tipAttrs(it.name, it.note || KIND_TIP[it.kind] || "");

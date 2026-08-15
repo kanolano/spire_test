@@ -25,13 +25,12 @@ let selection: Selection | null = null;
 export let dailyMode = false;
 export const setDailyMode = (on: boolean) => { dailyMode = on; };
 
-/** So animations only fire on real changes, not on a re-render. */
+/** So the director only runs on a real server response, not on a re-render
+ *  caused by selecting or cancelling a card. */
 export let lastScreen: string | null = null;
-export let lastTurn = -1;
 export let pendingFx = false;
 
 export const setLastScreen = (s: string | null) => { lastScreen = s; };
-export const setLastTurn = (t: number) => { lastTurn = t; };
 export const setPendingFx = (on: boolean) => { pendingFx = on; };
 
 /** The current snapshot. Throws if read before boot — every screen renderer
@@ -56,7 +55,6 @@ export function resetForNewRun() {
   selection = null;
   pendingFx = false;
   lastScreen = null;
-  lastTurn = -1;
 }
 
 let renderHook: (() => void) | null = null;

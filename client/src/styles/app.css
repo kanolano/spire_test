@@ -148,14 +148,16 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .card.static,.card.static:hover{cursor:default;transform:none;box-shadow:var(--shadow)}
 .card.pick{border-color:var(--gold2)}
 .card.pick:hover{border-color:var(--gold)}
-/* dealt only when a new hand is drawn */
-#hand.deal .card{animation:deal .26s ease backwards}
+/* Hand nodes now persist across updates and are keyed by card uid, so this
+   fires exactly when a card node is created — which is exactly when a card is
+   drawn. It used to be re-applied to the whole hand on every new turn. */
+#hand .card{animation:deal .26s ease backwards}
 @keyframes deal{from{opacity:0;transform:translateY(28px)}}
-#hand.deal .card:nth-child(1){animation-delay:.02s} #hand.deal .card:nth-child(2){animation-delay:.05s}
-#hand.deal .card:nth-child(3){animation-delay:.08s} #hand.deal .card:nth-child(4){animation-delay:.11s}
-#hand.deal .card:nth-child(5){animation-delay:.14s} #hand.deal .card:nth-child(6){animation-delay:.17s}
-#hand.deal .card:nth-child(7){animation-delay:.20s} #hand.deal .card:nth-child(8){animation-delay:.23s}
-#hand.deal .card:nth-child(9){animation-delay:.26s} #hand.deal .card:nth-child(10){animation-delay:.29s}
+#hand .card:nth-child(1){animation-delay:.02s} #hand .card:nth-child(2){animation-delay:.05s}
+#hand .card:nth-child(3){animation-delay:.08s} #hand .card:nth-child(4){animation-delay:.11s}
+#hand .card:nth-child(5){animation-delay:.14s} #hand .card:nth-child(6){animation-delay:.17s}
+#hand .card:nth-child(7){animation-delay:.20s} #hand .card:nth-child(8){animation-delay:.23s}
+#hand .card:nth-child(9){animation-delay:.26s} #hand .card:nth-child(10){animation-delay:.29s}
 
 /* ── combat ──────────────────────────────────────────────── */
 #enemies{display:flex;gap:34px;justify-content:center;align-items:center;flex:1;
@@ -164,12 +166,16 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
   border:1px solid transparent;transition:border-color .12s,background .12s}
 .foe.dead{opacity:.25;filter:grayscale(1)}
 .foe.targetable{cursor:crosshair;border-color:var(--gold);background:rgba(224,185,120,.06)}
+/* The idle bob lives on .sprite and directed motion (lunge, recoil, death)
+   lives on .foe-body, so the two never fight over one transform. */
+.foe-body{will-change:transform,filter}
 .foe .sprite{font-size:70px;line-height:1.05;filter:drop-shadow(0 8px 10px rgba(0,0,0,.6));
   animation:float 4s ease-in-out infinite}
 .foe:nth-child(2) .sprite{animation-delay:-1.3s}
 .foe:nth-child(3) .sprite{animation-delay:-2.6s}
 .foe:nth-child(4) .sprite{animation-delay:-.7s}
 @keyframes float{50%{transform:translateY(-5px)}}
+.foe-chips{justify-content:center;margin-top:6px}
 .foe .shadow{width:70px;height:9px;margin:0 auto 9px;border-radius:50%;
   background:radial-gradient(ellipse at center,rgba(0,0,0,.65),transparent 70%)}
 .foe .fname{font-family:var(--display);font-size:15px;margin:2px 0 6px}
@@ -449,3 +455,11 @@ body.busy .card,body.busy .foe,body.busy button{pointer-events:none}
   }
   #embers{display:none}
 }
+/* ?motion=off forces the same branch the media query takes, so the reduced
+   path can actually be driven and tested rather than assumed. */
+body.no-motion *,body.no-motion *::before,body.no-motion *::after{
+  animation-duration:.001ms !important;
+  animation-iteration-count:1 !important;
+  transition-duration:.001ms !important;
+}
+body.no-motion #embers{display:none}
