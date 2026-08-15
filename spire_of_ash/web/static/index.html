@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>Spire of Ash</title>
-  <script type="module" crossorigin src="/static/assets/index-DlnLGuhx.js"></script>
-  <link rel="stylesheet" crossorigin href="/static/assets/index-BUhKs_gb.css">
+<!-- Inline, so it costs no request and keeps the repo free of binaries. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230a0810'/%3E%3Cpath d='M16 5C10 13 8 17 8 20a8 8 0 0 0 16 0c0-3-2-7-8-15z' fill='%23e0b978'/%3E%3Cpath d='M16 15c-2.6 3-3.6 4.6-3.6 6.2a3.6 3.6 0 0 0 7.2 0c0-1.6-1-3.2-3.6-6.2z' fill='%23c8503f'/%3E%3C/svg%3E">
+  <script type="module" crossorigin src="/static/assets/index-BtS9u7Qq.js"></script>
+  <link rel="stylesheet" crossorigin href="/static/assets/index-Dn1zhrAY.css">
 </head>
 <body>
 
@@ -25,6 +27,8 @@
   <span class="spacer"></span>
   <span class="chips" id="s-relics"></span>
   <span class="chips" id="s-potions"></span>
+  <button class="tbtn" data-act="sound" id="s-sound" aria-pressed="false"
+          aria-label="Toggle sound"></button>
   <button class="tbtn" data-act="deck">Deck <span class="ghost" id="s-decksize"></span></button>
   <button class="tbtn" data-act="help" aria-label="How to play">?</button>
   <button class="tbtn danger" data-act="quit" aria-label="Abandon this run">Quit</button>

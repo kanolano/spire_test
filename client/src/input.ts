@@ -6,10 +6,12 @@
 
 import { reconnect, send } from "./actions";
 import { isPlaying, skip } from "./director";
+import { setSound, soundOn } from "./audio";
 import { isOffline } from "./net";
 import { SCREENS } from "./render";
 import { clickPotion } from "./screens/combat";
 import { maybeS, render, S, sel, setSel } from "./store";
+import { renderSoundToggle } from "./ui/topbar";
 import {
   closeOverlay, confirmQuit, overlayOpen, pendingConfirm, showDeck, showHelp,
   showPile, showRelics,
@@ -60,6 +62,7 @@ export function wireInput() {
       case "deck":
         if (maybeS() && S().screen !== "select") showDeck();
         break;
+      case "sound": setSound(!soundOn()); renderSoundToggle(); break;
       case "help": showHelp(); break;
       case "close-overlay": closeOverlay(); break;
       case "quit": if (maybeS()) confirmQuit(); break;

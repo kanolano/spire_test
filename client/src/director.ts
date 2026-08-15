@@ -13,6 +13,8 @@
 
 import { gsap } from "gsap";
 
+import { sfx } from "./audio";
+
 import { $, el } from "./dom";
 import { setBusy } from "./net";
 import { combatScene, updateCombat } from "./screens/combat";
@@ -115,7 +117,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       const target = ev.target == null ? scene.hero : scene.foes[ev.target]?.root;
       const from = card.getBoundingClientRect();
       const to = (target ?? scene.hero).getBoundingClientRect();
-      if (ev.cost > 0) tl.call(() => pulseOrb());
+      tl.call(() => { sfx.card(); if (ev.cost > 0) { pulseOrb(); sfx.spend(); } });
       tl.to(card, {
         duration: d(BEAT.play) * 0.4, y: -34, scale: 1.06, ease: "power2.out",
       }).to(card, {
@@ -167,6 +169,13 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
         float(target.box, shown, ev.amount > 0 ? "dmg" : "blk");
         setHp(ev.who, ev.hp, after);
         setBlock(ev.who, ev.block, after);
+        if (ev.amount > 0) {
+          const max = ev.who === "player"
+            ? after.player.max_hp : (after.combat?.enemies[ev.who]?.max_hp ?? 30);
+          sfx.hit(Math.min(1.6, 0.6 + (ev.amount / max) * 3));
+        } else {
+          sfx.blocked();
+        }
       });
       tl.to(target.body, {
         duration: d(BEAT.damage) * 0.3,
@@ -209,6 +218,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       tl.call(() => {
         float(target.box, `${heal ? "+" : "-"}${ev.amount}`, heal ? "heal" : "dmg");
         setHp(ev.who, ev.hp, after);
+        if (heal) sfx.heal(); else sfx.hit(0.7);
       });
       tl.to(target.body, {
         duration: d(BEAT.status), filter: heal ? "brightness(1.5)" : "brightness(0.7)",
@@ -223,6 +233,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       tl.call(() => {
         float(target.box, `+${ev.amount} 🛡`, "blk");
         setBlock(ev.who, ev.total, after);
+        sfx.guard();
       });
       tl.to(target.box, {
         duration: d(BEAT.block), scale: 1.03, yoyo: true, repeat: 1,
@@ -234,6 +245,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
     case "status": {
       const target = hitTarget(ev.who);
       if (!target) break;
+      tl.call(() => sfx.hex());
       tl.to(target.body, {
         duration: d(BEAT.status), scale: 1.06, yoyo: true, repeat: 1,
         ease: "power2.out",
@@ -244,7 +256,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
     case "death": {
       const foe = combatScene()?.foes[ev.who];
       if (!foe) break;
-      tl.call(() => setHp(ev.who, 0, after));
+      tl.call(() => { setHp(ev.who, 0, after); sfx.death(); });
       tl.to(foe.body, {
         duration: d(BEAT.death) * 0.25, scale: 1.12,
         filter: "brightness(3)", ease: "power2.out",
@@ -258,6 +270,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
 
     case "draw":
       // The hand itself is reconciled at the end; this only paces the deal.
+      tl.call(() => sfx.deal(0));
       tl.to({}, { duration: d(BEAT.draw) });
       break;
 
