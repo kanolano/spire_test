@@ -386,3 +386,165 @@ class TestIntentPreview(unittest.TestCase):
         self.assertEqual(foe.s("strength"), 0)
         self.assertEqual(foe.s("ritual"), 3)
         self.assertEqual(cb.player.s("vulnerable"), 2)
+
+
+class TestEffectStream(unittest.TestCase):
+    """The ordered record of what happened, which the browser client animates.
+
+    These assert *order and attribution*, not presentation. A client that shows
+    a lunge before the damage it caused, or credits a blow to the wrong enemy,
+    is reading this stream — so the stream is what has to be right.
+    """
+
+    def kinds(self, cb):
+        return [e["k"] for e in cb.fx]
+
+    def only(self, cb, k):
+        return [e for e in cb.fx if e["k"] == k]
+
+    def test_a_blow_is_reported_with_what_block_ate(self):
+        cb = make_combat()
+        foe = cb.enemies[0]
+        foe.block = 4
+        cb.fx.clear()
+        cb.damage(foe, 10)
+        hit, = self.only(cb, "damage")
+        self.assertEqual(hit["who"], 0)
+        self.assertEqual(hit["blocked"], 4)
+        self.assertEqual(hit["amount"], 6)
+        self.assertEqual(hit["hp"], foe.hp)
+
+    def test_a_fully_blocked_blow_still_reports(self):
+        """Block shattering is worth showing; it used to be indistinguishable
+        from nothing happening."""
+        cb = make_combat()
+        foe = cb.enemies[0]
+        foe.block = 20
+        cb.fx.clear()
+        cb.damage(foe, 5)
+        hit, = self.only(cb, "damage")
+        self.assertEqual((hit["amount"], hit["blocked"]), (0, 5))
+
+    def test_the_swing_comes_before_the_damage_it_causes(self):
+        cb = make_combat()
+        cb.fx.clear()
+        cb.player_attack(cb.enemies[0], 6)
+        kinds = self.kinds(cb)
+        self.assertLess(kinds.index("swing"), kinds.index("damage"))
+
+    def test_every_hit_of_a_multi_hit_attack_is_its_own_swing(self):
+        cb = make_combat(("cultist",))
+        cb.enemies[0].hp = 500
+        cb.fx.clear()
+        cb.player_attack(cb.enemies[0], 3, times=4)
+        self.assertEqual(len(self.only(cb, "swing")), 4)
+        self.assertEqual(len(self.only(cb, "damage")), 4)
+
+    def test_a_dead_enemy_stops_swinging_mid_attack(self):
+        """The engine already stopped resolving hits after a kill; the stream
+        must not claim they landed."""
+        cb = make_combat(("cultist",))
+        cb.enemies[0].hp = 4
+        cb.fx.clear()
+        cb.player_attack(cb.enemies[0], 4, times=5)
+        self.assertEqual(len(self.only(cb, "swing")), 1)
+        self.assertEqual(len(self.only(cb, "death")), 1)
+
+    def test_death_is_reported_before_the_line_that_announces_it(self):
+        cb = make_combat(("cultist",))
+        cb.enemies[0].hp = 3
+        cb.fx.clear()
+        cb.player_attack(cb.enemies[0], 20)
+        kinds = self.kinds(cb)
+        self.assertLess(kinds.index("death"), kinds.index("log"))
+
+    def test_each_enemy_turn_is_bracketed(self):
+        cb = make_combat(("cultist", "jaw_worm"))
+        cb.player_turn_start()
+        cb.fx.clear()
+        cb.enemy_turns()
+        acts = self.only(cb, "act")
+        ends = self.only(cb, "act_end")
+        self.assertEqual([a["who"] for a in acts], [0, 1])
+        self.assertEqual([a["who"] for a in ends], [0, 1])
+
+    def test_the_bracket_closes_even_when_the_enemy_dies_inside_it(self):
+        cb = make_combat(("cultist",))
+        foe = cb.enemies[0]
+        cb.player.st["thorns"] = 999
+        foe.hp = 1
+        foe.intent = next(m for m, spec in foe.moves.items()
+                          if spec["kind"] == "attack")
+        cb.fx.clear()
+        cb.enemy_turns()
+        self.assertEqual(len(self.only(cb, "act")), 1)
+        self.assertEqual(len(self.only(cb, "act_end")), 1)
+
+    def test_the_bracket_closes_even_when_the_player_dies_inside_it(self):
+        cb = make_combat(("jaw_worm",))
+        cb.player.hp = 1
+        foe = cb.enemies[0]
+        foe.intent = next(m for m, spec in foe.moves.items()
+                          if spec["kind"] == "attack")
+        cb.fx.clear()
+        with self.assertRaises(Defeat):
+            cb.enemy_turns()
+        self.assertEqual(len(self.only(cb, "act_end")), 1)
+
+    def test_the_killing_blow_is_recorded_before_defeat_unwinds(self):
+        cb = make_combat()
+        cb.player.hp = 2
+        cb.fx.clear()
+        with self.assertRaises(Defeat):
+            cb.damage(cb.player, 50)
+        hit, = self.only(cb, "damage")
+        self.assertEqual((hit["who"], hit["hp"]), ("player", 0))
+
+    def test_playing_a_card_reports_the_play_before_its_effect(self):
+        cb = make_combat()
+        cb.player_turn_start()
+        cb.hand = [Card("strike")]
+        cb.energy = 3
+        cb.fx.clear()
+        cb.play_card(0, 0)
+        kinds = self.kinds(cb)
+        self.assertLess(kinds.index("play"), kinds.index("damage"))
+        play, = self.only(cb, "play")
+        self.assertEqual((play["key"], play["target"]), ("strike", 0))
+
+    def test_a_played_card_reaches_the_discard_in_the_stream(self):
+        cb = make_combat()
+        cb.player_turn_start()
+        cb.hand = [Card("strike")]
+        cb.energy = 3
+        cb.fx.clear()
+        cb.play_card(0, 0)
+        self.assertEqual([d["key"] for d in self.only(cb, "discard")], ["strike"])
+
+    def test_drawing_reports_one_event_per_card(self):
+        cb = make_combat()
+        cb.fx.clear()
+        cb.player_turn_start()
+        self.assertEqual(len(self.only(cb, "draw")), B.BASE_DRAW)
+        self.assertEqual(self.kinds(cb)[0], "turn")
+
+    def test_block_and_statuses_carry_their_running_total(self):
+        cb = make_combat()
+        cb.fx.clear()
+        cb.gain_block(cb.player, 5)
+        cb.gain_block(cb.player, 3)
+        self.assertEqual([b["total"] for b in self.only(cb, "block")], [5, 8])
+        cb.fx.clear()
+        cb.apply(cb.enemies[0], "vulnerable", 2)
+        vuln, = self.only(cb, "status")
+        self.assertEqual((vuln["key"], vuln["n"], vuln["total"]), ("vulnerable", 2, 2))
+
+    def test_the_log_is_interleaved_rather_than_appended_at_the_end(self):
+        """A log line is an event in its own right, so the combat log can
+        scroll in step with the action instead of arriving all at once."""
+        cb = make_combat(("cultist",))
+        cb.enemies[0].hp = 2
+        cb.fx.clear()
+        cb.player_attack(cb.enemies[0], 50)
+        self.assertEqual([e["text"] for e in self.only(cb, "log")],
+                         ["Cultist is slain!"])

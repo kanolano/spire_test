@@ -54,6 +54,7 @@ class Run:
         self.treasure = None
         self.banner = None
         self.killer = "—"
+        self.fx = []
         self.screen = "map" if cls else "select"
 
     @property
@@ -129,6 +130,12 @@ class Run:
         # A banner survives any number of state() reads and clears once the
         # player does something. state() itself must stay side-effect free.
         self.banner = None
+        # One action, one effect stream. The Run holds it rather than the
+        # Combat because the last blow of a fight has to survive game_over()
+        # and victory() setting self.combat to None.
+        self.fx = []
+        if self.combat is not None:
+            self.combat.fx = self.fx
         handler(self, action)
         return self.state()
 
@@ -197,7 +204,7 @@ class Run:
     def start_combat(self, kind):
         enemies, label = make_encounter(self.rng, self.act, kind, self.cur_floor)
         cb = Combat(self.player, enemies, self.rng,
-                    f"{label} — floor {self.cur_floor + 1}", kind)
+                    f"{label} — floor {self.cur_floor + 1}", kind, fx=self.fx)
         self.combat = cb
         self.screen = "combat"
         try:
@@ -526,6 +533,10 @@ class Run:
         cb = self.combat
         st = {
             "screen": self.screen,
+            # What happened during the action that produced this state, in
+            # order. Empty for a plain read. A client is free to ignore it and
+            # just take the snapshot — the terminal does.
+            "fx": list(self.fx),
             "act": self.act,
             "floor": self.cur_floor + 1,
             "floors_cleared": self.floors_cleared,
@@ -612,6 +623,7 @@ class Run:
         run.screen = d["screen"]
         run.killer = d["killer"]
         run.banner = tuple(d["banner"]) if d["banner"] else None
+        run.fx = []
         run.combat = (Combat.from_dict(d["combat"], run.player, run.rng)
                       if d["combat"] else None)
         run.treasure = d["treasure"]

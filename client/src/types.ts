@@ -107,8 +107,6 @@ export interface CombatView {
   discard: number;
   exhaust: number;
   log: string[];
-  /** Ordered effect timeline for the action just applied. Phase 1. */
-  fx?: FxEvent[];
 }
 
 /* ── the effect stream (engine/combat.py emit()) ───────────── */
@@ -119,19 +117,27 @@ export type Who = "player" | number;
 export type FxEvent =
   | { k: "log"; text: string }
   | { k: "turn"; phase: "player_start" | "player_end" | "enemy_start" }
+  /** Brackets one enemy's whole turn. `act_end` always arrives, even if the
+   *  enemy — or the player — died inside it. */
   | { k: "act"; who: number; move: string }
   | { k: "act_end"; who: number }
-  | { k: "play"; uid: number; key: string; target: number | null }
+  /** `idx` is the hand index the card occupied when it was played, so it
+   *  matches the previous snapshot's hand. */
+  | { k: "play"; idx: number; key: string; cost: number; target: number | null }
+  /** One per hit — a four-hit attack emits four, and stops early on a kill. */
   | { k: "swing"; src: Who; dst: Who }
-  | { k: "damage"; who: Who; amount: number; blocked: number; hp: number }
+  /** `amount` is HP actually lost, `blocked` is what Block ate. A fully
+   *  blocked blow still arrives, with amount 0. */
+  | { k: "damage"; who: Who; amount: number; blocked: number; hp: number; block: number }
   | { k: "block"; who: Who; amount: number; total: number }
-  | { k: "heal"; who: Who; amount: number }
-  | { k: "lose_hp"; who: Who; amount: number }
-  | { k: "status"; who: Who; key: string; n: number }
+  | { k: "heal"; who: Who; amount: number; hp: number }
+  | { k: "lose_hp"; who: Who; amount: number; hp: number }
+  | { k: "status"; who: Who; key: string; n: number; total: number }
   | { k: "death"; who: number }
-  | { k: "draw"; n: number }
-  | { k: "discard"; uid: number }
-  | { k: "exhaust"; uid: number };
+  | { k: "draw"; key: string }
+  | { k: "discard"; key: string }
+  | { k: "exhaust"; key: string }
+  | { k: "shuffle"; n: number };
 
 /* ── screen payloads ───────────────────────────────────────── */
 
@@ -196,6 +202,10 @@ export interface TreasureView { gold: number; relic: RelicView }
 
 export interface State {
   screen: Screen;
+  /** What happened during the action that produced this state, in order.
+   *  Empty on a plain read. Lives at the top level rather than under `combat`
+   *  because the last blow of a fight has to outlive the combat itself. */
+  fx: FxEvent[];
   act: number;
   floor: number;
   floors_cleared: number;
