@@ -31,20 +31,8 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 ::-webkit-scrollbar-thumb{background:#352d48;border-radius:2px}
 ::-webkit-scrollbar-thumb:hover{background:#463b5e}
 
-/* drifting embers */
-#embers{position:fixed;inset:0;pointer-events:none;z-index:1;overflow:hidden}
-#embers i{position:absolute;bottom:-16px;width:2px;height:2px;background:#e0964e;
-  box-shadow:0 0 7px 1px #cf6f2a66;opacity:0;animation:ember linear infinite}
-@keyframes ember{0%{transform:translate(0,0);opacity:0}12%{opacity:.4}
-  70%{opacity:.22}100%{transform:translate(var(--dx,14px),-104vh);opacity:0}}
-#embers i:nth-child(1){left:8%;animation-duration:22s;animation-delay:-2s;--dx:26px}
-#embers i:nth-child(2){left:19%;animation-duration:27s;animation-delay:-9s;--dx:-18px}
-#embers i:nth-child(3){left:31%;animation-duration:19s;animation-delay:-14s;--dx:22px}
-#embers i:nth-child(4){left:44%;animation-duration:30s;animation-delay:-5s;--dx:-30px}
-#embers i:nth-child(5){left:57%;animation-duration:24s;animation-delay:-18s;--dx:16px}
-#embers i:nth-child(6){left:69%;animation-duration:28s;animation-delay:-11s;--dx:-24px}
-#embers i:nth-child(7){left:81%;animation-duration:20s;animation-delay:-3s;--dx:28px}
-#embers i:nth-child(8){left:92%;animation-duration:26s;animation-delay:-16s;--dx:-14px}
+/* The drifting ash is a canvas now (particles.ts), mounted by main.ts and
+   never mounted at all under reduced motion — so there is nothing to hide. */
 
 /* ── top bar ─────────────────────────────────────────────── */
 #top{
@@ -583,7 +571,9 @@ body.busy .card,body.busy .foe,body.busy button{pointer-events:none}
 #mapwrap{max-width:100%;overflow-x:auto}
 
 /* ── reduced motion ─────────────────────────────────────────
-   Embers, sprite float and node pulse ran forever with no guard. */
+   Sprite float, node pulse and the screen transitions all run forever or on
+   every change with no guard of their own. The particle layer is not listed
+   because it is never mounted in this mode at all. */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{
     animation-duration:.001ms !important;
@@ -591,7 +581,6 @@ body.busy .card,body.busy .foe,body.busy button{pointer-events:none}
     transition-duration:.001ms !important;
     scroll-behavior:auto !important;
   }
-  #embers{display:none}
 }
 /* ?motion=off forces the same branch the media query takes, so the reduced
    path can actually be driven and tested rather than assumed. */
@@ -600,4 +589,3 @@ body.no-motion *,body.no-motion *::before,body.no-motion *::after{
   animation-iteration-count:1 !important;
   transition-duration:.001ms !important;
 }
-body.no-motion #embers{display:none}

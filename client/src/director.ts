@@ -17,6 +17,7 @@ import { sfx } from "./audio";
 
 import { $, el } from "./dom";
 import { setBusy } from "./net";
+import { motes, sparks } from "./particles";
 import { combatScene, updateCombat } from "./screens/combat";
 import type { FxEvent, State, Who } from "./types";
 
@@ -172,9 +173,12 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
         if (ev.amount > 0) {
           const max = ev.who === "player"
             ? after.player.max_hp : (after.combat?.enemies[ev.who]?.max_hp ?? 30);
-          sfx.hit(Math.min(1.6, 0.6 + (ev.amount / max) * 3));
+          const power = Math.min(1.6, 0.6 + (ev.amount / max) * 3);
+          sfx.hit(power);
+          sparks(target.body, power);
         } else {
           sfx.blocked();
+          sparks(target.body, 0.4, true);
         }
       });
       tl.to(target.body, {
@@ -256,7 +260,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
     case "death": {
       const foe = combatScene()?.foes[ev.who];
       if (!foe) break;
-      tl.call(() => { setHp(ev.who, 0, after); sfx.death(); });
+      tl.call(() => { setHp(ev.who, 0, after); sfx.death(); motes(foe.body); });
       tl.to(foe.body, {
         duration: d(BEAT.death) * 0.25, scale: 1.12,
         filter: "brightness(3)", ease: "power2.out",

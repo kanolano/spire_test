@@ -7,6 +7,7 @@ import { reducedMotion } from "./director";
 import { wireAudioUnlock } from "./audio";
 import { wireDrag } from "./drag";
 import { wireInput } from "./input";
+import { mountParticles } from "./particles";
 import { render } from "./render";
 import { onRender } from "./store";
 import { wireTooltips } from "./ui/tooltip";
@@ -23,5 +24,6 @@ if (artSheetRequested()) {
   wireInput();
   wireDrag();
   wireAudioUnlock();
+  mountParticles();
   void boot();
 }
