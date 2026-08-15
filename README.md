@@ -88,6 +88,14 @@ client can draw. `tests/test_content.py` checks it against the content tables,
 so a monster added without art fails the suite rather than quietly rendering as
 a generic blob.
 
+Two query flags exist for working on the look, in dev and in the built client
+alike:
+
+| Flag | What it does |
+|---|---|
+| `?art=1` | The contact sheet: every creature, map icon and set piece side by side. Judging art one screen at a time, by playing to it, is how a set drifts apart |
+| `?motion=off` | Takes the same branch `prefers-reduced-motion` takes, so the reduced path can be driven and tested rather than assumed |
+
 Where a card needs a choice the player has to make (True Grit+ picking a card to
 exhaust), the client sends that choice with the action — `Card.requires` says
 which. The engine never blocks waiting for input.
