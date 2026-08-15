@@ -1,5 +1,6 @@
 /** The one card factory, used by combat, rewards, shop, pickers and the deck. */
 
+import { cardEmblem } from "../art/sigils";
 import { el, esc } from "../dom";
 import type { CardView } from "../types";
 
@@ -24,6 +25,9 @@ export function cardEl(c: CardView, opts: CardOpts = {}): HTMLDivElement {
   // Stable identity, so a card can be tracked from hand to target to discard.
   d.dataset.uid = String(c.uid);
   d.innerHTML =
+    // The watermark was a single CSS glyph for the whole type. It is now a
+    // motif keyed to what the card does, so a hand is scannable by shape.
+    `<div class="cart">${cardEmblem(c.key, c.type)}</div>` +
     `<div class="cost">${c.cost}</div>` +
     (opts.kbd != null ? `<div class="kbd">${opts.kbd}</div>` : "") +
     `<div class="cname">${esc(c.name)}</div><div class="ctype">${c.type}</div>` +

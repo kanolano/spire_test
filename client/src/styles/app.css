@@ -77,6 +77,11 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .icon{width:29px;height:29px;border-radius:3px;display:grid;place-items:center;font-size:15px;
   position:relative;cursor:help;flex:0 0 auto;background:#221c30;border:1px solid var(--line2);
   transition:border-color .12s,background .12s}
+.icon svg{width:21px;height:21px;display:block}
+.icon:hover svg{filter:drop-shadow(0 0 4px rgba(224,185,120,.5))}
+/* Reward rows show the same sigils at a larger size. */
+.rico svg{width:26px;height:26px;display:block}
+.rico{display:grid;place-items:center;width:26px;height:26px}
 .icon:hover{border-color:var(--gold);background:#2b2440}
 .icon.potion{cursor:pointer;border-color:#4e3868}
 .icon.potion:hover{border-color:var(--pow)}
@@ -116,12 +121,15 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
   cursor:pointer;flex:0 0 auto;overflow:hidden;
   transition:transform .12s ease,border-color .12s,box-shadow .12s;
 }
-.card::after{content:var(--glyph,"✦");position:absolute;right:6px;bottom:-6px;font-size:62px;
-  line-height:1;color:var(--edge,#fff);opacity:.07;pointer-events:none;font-family:var(--ui)}
-.card.t-ATTACK{--edge:var(--atk);--tint:rgba(207,90,69,.20);--glyph:"⚔"}
-.card.t-SKILL {--edge:var(--skl);--tint:rgba(76,159,200,.18);--glyph:"◈"}
-.card.t-POWER {--edge:var(--pow);--tint:rgba(169,123,216,.18);--glyph:"✦"}
-.card.t-CURSE,.card.t-STATUS{--edge:var(--cur);--tint:rgba(122,114,144,.14);--glyph:"☠"}
+/* The watermark: a motif keyed to what the card does, tinted by its type. */
+.card .cart{position:absolute;right:-8px;bottom:-14px;width:82px;height:82px;
+  color:var(--edge,#fff);opacity:.13;pointer-events:none}
+.card .cart svg{width:100%;height:100%;display:block}
+.card.up .cart{opacity:.2}
+.card.t-ATTACK{--edge:var(--atk);--tint:rgba(207,90,69,.20)}
+.card.t-SKILL {--edge:var(--skl);--tint:rgba(76,159,200,.18)}
+.card.t-POWER {--edge:var(--pow);--tint:rgba(169,123,216,.18)}
+.card.t-CURSE,.card.t-STATUS{--edge:var(--cur);--tint:rgba(122,114,144,.14)}
 .card .cost{position:absolute;top:10px;left:11px;width:26px;height:26px;border-radius:3px;
   background:#0f0b17;border:1px solid var(--gold2);color:var(--gold);
   font-family:var(--display);font-weight:700;font-size:14px;display:grid;place-items:center}

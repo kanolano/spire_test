@@ -8,62 +8,22 @@
  */
 
 import { creatureSvg, CREATURE_KEYS } from "./creatures";
+import {
+  POTION_KEYS_ART, RELIC_KEYS, potionSigil, relicSigil,
+} from "./sigils";
 
-export const RELICS: Record<string, string> = {
-  burning_blood: "🩸",
-  bag_of_marbles: "🔮",
-  anchor: "⚓",
-  vajra: "🔱",
-  oddly_smooth_stone: "🥚",
-  bronze_scales: "⚖️",
-  blood_vial: "🧪",
-  lantern: "🏮",
-  happy_flower: "🌼",
-  pen_nib: "🖋️",
-  strawberry: "🍓",
-  meat_on_bone: "🍖",
-  kunai: "🗡️",
-  bag_of_prep: "🎒",
-  art_of_war: "📜",
-  ash_phial: "⚱️",
-  emberheart: "🫀",
-  ashglass_vial: "🫙",
-  smoulder_stone: "🪨",
-  grave_ash: "⚰️",
-  bone_dice: "🎲",
-  oathkeeper: "🕯️",
-  hollow_lantern: "🏮",
-};
-
-export const POTIONS: Record<string, string> = {
-  fire: "🔥",
-  block: "🛡️",
-  strength: "💪",
-  energy: "⚡",
-  swift: "💨",
-  explosive: "💥",
-  weak: "🌀",
-  fear: "😱",
-  blood: "🩸",
-};
-
+/** Only reached if a content id has no art, which the manifest test prevents. */
 export const FALLBACK = { creature: "👾", relic: "◈", potion: "🧪" } as const;
 
-export function creature(key: string): string {
-  return creatureSvg(key) ?? FALLBACK.creature;
-}
-export function relic(key: string): string {
-  return RELICS[key] ?? FALLBACK.relic;
-}
-export function potion(key: string): string {
-  return POTIONS[key] ?? FALLBACK.potion;
-}
+export const creature = (key: string) => creatureSvg(key) ?? FALLBACK.creature;
+export const relic = (key: string) => relicSigil(key) ?? FALLBACK.relic;
+export const potion = (key: string) => potionSigil(key) ?? FALLBACK.potion;
 
 /** Read at build time by the art-manifest plugin. */
 export function manifest() {
   return {
     creatures: CREATURE_KEYS,
-    relics: Object.keys(RELICS),
-    potions: Object.keys(POTIONS),
+    relics: RELIC_KEYS,
+    potions: POTION_KEYS_ART,
   };
 }
