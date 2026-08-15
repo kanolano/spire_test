@@ -13,6 +13,7 @@
 
 import { gsap } from "gsap";
 
+import { shieldMark } from "./art/marks";
 import { sfx } from "./audio";
 
 import { $, el } from "./dom";
@@ -235,7 +236,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       const target = hitTarget(ev.who);
       if (!target) break;
       tl.call(() => {
-        float(target.box, `+${ev.amount} 🛡`, "blk");
+        float(target.box, `+${ev.amount}`, "blk");
         setBlock(ev.who, ev.total, after);
         sfx.guard();
       });
@@ -353,7 +354,8 @@ function setHp(who: Who, hp: number, after: State) {
 function setBlock(who: Who, block: number, after: State) {
   const scene = combatScene();
   if (!scene) return;
-  const badge = block ? `<span class="block-badge">🛡 ${block}</span>` : "";
+  const badge = block
+    ? `<span class="block-badge">${shieldMark()} ${block}</span>` : "";
   if (who === "player") {
     scene.pname.innerHTML = escapeName(after.player.name) + badge;
     return;

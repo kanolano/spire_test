@@ -15,6 +15,7 @@
 import { send } from "../actions";
 import { backdropSvg } from "../art/backdrop";
 import { heroSvg } from "../art/heroes";
+import { intentMark, shieldMark } from "../art/marks";
 import * as art from "../art/registry";
 import { el, esc, LETTERS, tipAttrs } from "../dom";
 import { S, sel, setSel } from "../store";
@@ -25,9 +26,6 @@ import { POTION_KEYS } from "../ui/topbar";
 
 // Non-attack intents used to read "▲ buff". The move's own name says far more,
 // and the tooltip carries the kind and whatever note it has.
-const GLYPH: Record<IntentKind, string> = {
-  attack: "⚔", block: "🛡", buff: "▲", debuff: "▼",
-};
 const KIND_TIP: Record<IntentKind, string> = {
   attack: "It will attack.",
   block: "It is defending.",
@@ -83,9 +81,9 @@ export function unmountCombat() {
 
 function intentHtml(it: IntentView): string {
   return it.kind === "attack"
-    ? `${GLYPH.attack} ${it.dmg}${(it.hits ?? 1) > 1 ? ` × ${it.hits}` : ""}`
+    ? `${intentMark("attack")} ${it.dmg}${(it.hits ?? 1) > 1 ? ` × ${it.hits}` : ""}`
       + `${it.extra ? " +" : ""}`
-    : `${GLYPH[it.kind] || "●"} ${esc(it.name)}`;
+    : `${intentMark(it.kind)} ${esc(it.name)}`;
 }
 
 /* ── mount ─────────────────────────────────────────────────── */
@@ -219,7 +217,7 @@ export function updateCombat(state: State = S()) {
   // The player's own block and statuses belong next to the player's body, not
   // buried in the stats bar.
   scene.heroPlate.innerHTML = p.block
-    ? `<span class="block-badge">🛡 ${p.block}</span>` : "";
+    ? `<span class="block-badge">${shieldMark()} ${p.block}</span>` : "";
   scene.heroChips.innerHTML = p.statuses.map(statusChip).join("");
   scene.hero.dataset.low = String(p.hp / p.max_hp < 0.35);
 
@@ -227,7 +225,7 @@ export function updateCombat(state: State = S()) {
   scene.orb.innerHTML =
     `${p.energy}<span style="font-size:12px;opacity:.6">/${p.max_energy}</span>`;
   scene.pname.innerHTML = esc(p.name)
-    + (p.block ? `<span class="block-badge">🛡 ${p.block}</span>` : "");
+    + (p.block ? `<span class="block-badge">${shieldMark()} ${p.block}</span>` : "");
   scene.hpFill.style.width = Math.max(0, p.hp) / p.max_hp * 100 + "%";
   scene.hpText.textContent = `${p.hp} / ${p.max_hp}`;
   scene.piles.innerHTML =
@@ -277,7 +275,7 @@ function updateFoe(n: FoeNodes, e: EnemyView, i: number, targetable: boolean) {
   n.name.innerHTML =
     (e.alive ? `<span style="color:var(--gold)">${LETTERS[i]}</span> · ` : "")
     + esc(e.name)
-    + (e.block ? `<span class="block-badge">🛡 ${e.block}</span>` : "");
+    + (e.block ? `<span class="block-badge">${shieldMark()} ${e.block}</span>` : "");
   n.barFill.style.width = Math.max(0, e.hp) / e.max_hp * 100 + "%";
   n.barNum.textContent = `${Math.max(0, e.hp)} / ${e.max_hp}`;
   n.chips.innerHTML = e.statuses.map(statusChip).join("");

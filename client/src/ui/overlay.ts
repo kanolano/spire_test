@@ -1,6 +1,7 @@
 /** The modal: deck, relics, piles, help, and the quit confirmation. */
 
 import { abandon } from "../actions";
+import { intentMark, shieldMark } from "../art/marks";
 import { $, el, esc } from "../dom";
 import { ApiError, getPiles, toast } from "../net";
 import { S } from "../store";
@@ -99,8 +100,9 @@ export function showHelp() {
       <p>Click a card to play it, or press its number. Cards cost <b>Energy</b> (the orb);
          you get 3 per turn. <kbd>E</kbd> ends the turn — your hand is discarded and the
          enemies act.</p>
-      <p><b>Block</b> 🛡 absorbs damage and disappears at the start of your next turn.
-         An enemy's intent shows what it will do: ⚔ is the damage you would take,
+      <p><b>Block</b> ${shieldMark()} absorbs damage and disappears at the start of your next turn.
+         An enemy's intent shows what it will do: ${intentMark("attack")} is the damage
+         you would take,
          already adjusted for your statuses.</p>
       <p>Targeted cards ask you to click an enemy (or press <kbd>a</kbd>–<kbd>d</kbd>).
          Potions are the chips in the top-right: click them or press
