@@ -9,6 +9,7 @@
 
 import { mountArtDefs } from "./defs";
 import { creatureSvg, CREATURE_KEYS } from "./creatures";
+import { NODE_KINDS, nodeBadge } from "./nodes";
 import { RAMP_NAMES, RAMPS } from "./palette";
 
 export const artSheetRequested = () =>
@@ -53,6 +54,26 @@ export function renderArtSheet() {
       <div style="font-size:11.5px;color:#9a8fb0;margin-top:8px">${key}</div>
     </div>`).join("");
   document.body.appendChild(grid);
+
+  // The map icons are drawn at 17px and judged nowhere else, which is how you
+  // end up with an elite skull that reads as a goblet. Here they are big.
+  const nodes = document.createElement("div");
+  nodes.style.cssText = "display:flex;gap:26px;flex-wrap:wrap;margin:34px 0 0";
+  nodes.innerHTML = NODE_KINDS.map((kind) => `
+    <div style="text-align:center">
+      <div style="display:grid;place-items:center;width:110px;height:110px;
+                  border:1px solid #372f4a;border-radius:4px;
+                  background:radial-gradient(circle at 35% 28%,#3a3052,#15111e)">
+        ${nodeBadge(kind, 78)}
+      </div>
+      <div style="font-size:11.5px;color:#9a8fb0;margin-top:6px">${kind}</div>
+      <div style="font-size:11.5px;color:#4a4260">${nodeBadge(kind, 17)}</div>
+    </div>`).join("");
+  const nh = document.createElement("h2");
+  nh.textContent = "Map nodes";
+  nh.style.cssText = "font:600 17px Georgia,serif;color:#e0b978;margin:34px 0 0";
+  document.body.appendChild(nh);
+  document.body.appendChild(nodes);
 
   // Height is set inline per creature so bosses read bigger; only the shared
   // presentation belongs here.
