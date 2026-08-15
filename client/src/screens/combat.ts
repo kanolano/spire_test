@@ -93,11 +93,16 @@ export function mountCombat(stage: HTMLElement) {
     const root = el("div", "foe");
     root.dataset.foe = String(i);
     const intent = el("div", "intent");
-    // The sprite sits inside a wrapper so idle bob (on .sprite) and directed
-    // motion like a lunge (on .foe-body) never fight over one transform.
+    // Three layers, because three things move the sprite and a CSS animation
+    // beats a plain declaration while an inline style beats both:
+    //   .foe-body  directed motion — the director tweens this inline
+    //   .foe-pose  the intent telegraph, plain CSS
+    //   .sprite    the idle bob, a running keyframe animation
     const body = el("div", "foe-body");
+    const pose = el("div", "foe-pose");
     const sprite = el("div", "sprite");
-    body.appendChild(sprite);
+    pose.appendChild(sprite);
+    body.appendChild(pose);
     const shadow = el("div", "shadow");
     const name = el("div", "fname");
     const bar = el("div", "fbar");
@@ -220,10 +225,15 @@ function updateFoe(n: FoeNodes, e: EnemyView, i: number, targetable: boolean) {
     n.intent.hidden = true;
   }
 
+  // Only redraw the sprite when it is genuinely a different creature —
+  // replacing the SVG would throw away whatever the director is mid-tween on.
   if (n.sprite.dataset.key !== e.key) {
     n.sprite.dataset.key = e.key;
     n.sprite.innerHTML = art.creature(e.key);
   }
+  // Posture keyed to what it is about to do: attacks coil forward, blocks
+  // hunker down, buffs swell. The CSS owns what each one looks like.
+  n.root.dataset.telegraph = e.alive && e.intent ? e.intent.kind : "";
 
   n.name.innerHTML =
     (e.alive ? `<span style="color:var(--gold)">${LETTERS[i]}</span> · ` : "")

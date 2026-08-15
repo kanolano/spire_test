@@ -137,17 +137,22 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
       const from = node(ev.src);
       const to = node(ev.dst);
       if (!from) break;
-      // Lunge a short way toward the target and snap back.
+      // Lunge a short way toward the target and snap back. The wind-up pulls
+      // *away* first, which is what makes the strike read as a strike.
       const dx = to ? Math.sign(centre(to) - centre(from)) * 26 : 0;
       const dy = to ? 0 : -14;
       tl.to(from, {
-        duration: d(BEAT.swing) * 0.35, x: dx * 0.4, y: dy,
+        duration: d(BEAT.swing) * 0.35, x: dx * -0.35, y: dy * 0.4,
         ease: "power2.in",
       }).to(from, {
         duration: d(BEAT.swing) * 0.25, x: dx, y: dy, ease: "power4.out",
       }).to(from, {
         duration: d(BEAT.swing) * 0.4, x: 0, y: 0, ease: "power2.out",
       });
+      // Rigged parts, if this creature has them. The director never needs to
+      // know which creature it is holding.
+      rig(from, ".rig-jaw", tl, d(BEAT.swing), { rotate: 12, y: 3 });
+      rig(from, ".rig-wing", tl, d(BEAT.swing), { scaleY: 0.7 });
       break;
     }
 
@@ -167,6 +172,7 @@ function beat(tl: gsap.core.Timeline, ev: FxEvent, after: State, scale: number) 
         duration: d(BEAT.damage) * 0.7,
         x: "-=9", filter: "brightness(1)", ease: "elastic.out(1, 0.45)",
       });
+      if (ev.amount > 0) rig(target.body, ".rig-eye", tl, d(BEAT.damage), { scale: 1.5 });
       if (ev.who === "player" && ev.amount > 0) {
         const hurt = ev.amount / Math.max(1, after.player.max_hp);
         tl.to($("#stage"), {
@@ -271,6 +277,29 @@ const centre = (n: HTMLElement) => {
   const r = n.getBoundingClientRect();
   return r.left + r.width / 2;
 };
+
+/**
+ * Animate a rigged part of whatever sprite is in `host`, if it has one.
+ *
+ * Creatures are composed from a shared kit, so a jaw is always `.rig-jaw` and
+ * eyes are always `.rig-eye`. That is the whole point of the rig: the director
+ * asks for "the jaw" and gets it on the creatures that have one, and nothing
+ * on the ones that do not.
+ */
+function rig(
+  host: HTMLElement, part: string, tl: gsap.core.Timeline,
+  duration: number, to: gsap.TweenVars,
+) {
+  const nodes = host.querySelectorAll(part);
+  if (!nodes.length) return;
+  tl.to(nodes, {
+    duration: duration * 0.4, ...to,
+    transformOrigin: "50% 50%", ease: "power2.out",
+  }, "<").to(nodes, {
+    duration: duration * 0.6, rotate: 0, y: 0, scale: 1, scaleY: 1,
+    ease: "power2.inOut",
+  });
+}
 
 /** Patch one combatant's HP mid-timeline. The event carries the absolute
  *  value, so this never has to reason about deltas. */
