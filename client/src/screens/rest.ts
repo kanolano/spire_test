@@ -1,5 +1,6 @@
 import { send } from "../actions";
-import { el } from "../dom";
+import { campfireScene } from "../art/scenes";
+import { el, staggerIn } from "../dom";
 import { S } from "../store";
 import type { Action } from "../types";
 
@@ -7,6 +8,7 @@ export function renderRest(st: HTMLElement) {
   const p = S().player;
   const full = p.hp >= p.max_hp;
   st.appendChild(el("h2", "title", "A campfire"));
+  st.appendChild(el("div", "scenewrap", campfireScene()));
   st.appendChild(el("div", "sub", "The embers are warm. You have time for one thing."));
   const heal = Math.min(p.max_hp - p.hp, Math.max(1, Math.floor(p.max_hp * 0.3)));
   const box = el("div", "choices");
@@ -28,6 +30,7 @@ export function renderRest(st: HTMLElement) {
     { type: "rest" }, full);
   opt(2, "Smith", "upgrade a card", { type: "smith" });
   opt(3, "Purge", "remove a card from your deck", { type: "purge" });
+  staggerIn(box.children);
   st.appendChild(box);
 }
 

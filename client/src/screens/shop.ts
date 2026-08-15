@@ -1,5 +1,6 @@
 import { send } from "../actions";
-import { ctaButton, el, esc } from "../dom";
+import { merchantScene } from "../art/scenes";
+import { ctaButton, el, esc, staggerIn } from "../dom";
 import { S } from "../store";
 import type { Action } from "../types";
 import { cardEl } from "../ui/card";
@@ -16,6 +17,7 @@ export function renderShop(st: HTMLElement) {
   const gold = state.player.gold;
 
   st.appendChild(el("h2", "title", "The merchant"));
+  st.appendChild(el("div", "scenewrap", merchantScene()));
   st.appendChild(el("div", "sub", `Your gold: ${gold}`));
 
   const row = el("div", "row");
@@ -26,6 +28,7 @@ export function renderShop(st: HTMLElement) {
       if ((c.price ?? 0) <= gold) void send({ type: "shop_buy", what: "card", idx: i });
     },
   })));
+  staggerIn(row.children);
   st.appendChild(row);
 
   SHOP_KEYS = {};
@@ -61,6 +64,9 @@ export function renderShop(st: HTMLElement) {
       { type: "shop_buy", what: "removal" });
   }
 
+  // The stall rows are appended one at a time above; stagger them together so
+  // the shop stocks itself rather than appearing fully laid out.
+  staggerIn(st.querySelectorAll(":scope > .item"), 0.05, 0.14);
   st.appendChild(ctaButton("Leave <kbd>Esc</kbd>", () => void send({ type: "shop_leave" })));
 }
 

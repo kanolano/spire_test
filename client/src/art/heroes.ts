@@ -48,9 +48,9 @@ const HEROES: Record<string, Hero> = {
 export const HERO_KEYS = Object.keys(HEROES);
 
 /** Facing right, toward the enemies. */
-export function heroSvg(cls: string): string {
+export function heroSvg(cls: string, px = 112): string {
   const hero = HEROES[cls] ?? HEROES["sentinel"]!;
-  return `<svg class="csprite hero" viewBox="10 8 80 88" style="height:112px"
+  return `<svg class="csprite hero" viewBox="10 8 80 88" style="height:${px}px"
       preserveAspectRatio="xMidYMax meet" data-hero="${cls}" aria-hidden="true">
     ${shadow(40)}
     <g class="rig-body">${hero.svg}</g>

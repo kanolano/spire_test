@@ -101,8 +101,38 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 #stage{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;width:100%;max-width:1180px;
   margin:0 auto;padding:18px 16px 30px;position:relative;z-index:3}
 #stage.screen-combat{display:flex;flex-direction:column;padding-bottom:26px}
-#stage.enter{animation:fadein .22s ease}
-@keyframes fadein{from{opacity:0}to{opacity:1}}
+/* Screen transitions carry direction: into a room, back out to the map, or
+   — for the screens that are not part of a climb — no travel at all. */
+#stage.enter-fwd{animation:pushfwd .26s cubic-bezier(.2,.72,.3,1)}
+#stage.enter-back{animation:pushback .26s cubic-bezier(.2,.72,.3,1)}
+#stage.enter-settle{animation:settle .34s ease}
+@keyframes pushfwd{from{opacity:0;transform:translateX(30px)}}
+@keyframes pushback{from{opacity:0;transform:translateX(-30px)}}
+@keyframes settle{from{opacity:0;transform:scale(.985)}}
+
+/* Contents arrive in the order they are read. Delay is set per node by
+   staggerIn(), because the counts are not knowable from CSS. */
+.risein{animation:risein .34s cubic-bezier(.2,.72,.3,1) backwards}
+@keyframes risein{from{opacity:0;transform:translateY(12px)}}
+
+/* ── set pieces ──────────────────────────────────────────── */
+.scenewrap{display:flex;justify-content:center;margin:6px 0 2px;
+  animation:scenein .5s ease backwards;animation-delay:.05s}
+@keyframes scenein{from{opacity:0;transform:translateY(8px) scale(.97)}}
+/* Sized against the viewport, not in fixed pixels: a 150px set piece pushed
+   the shop's Leave button off a 720px-tall screen. */
+.scene{display:block;overflow:visible;width:auto;height:clamp(78px,15vh,158px);
+  filter:drop-shadow(0 10px 16px rgba(0,0,0,.55))}
+.screen-rest .scene,.screen-treasure .scene,
+.screen-gameover .scene,.screen-win .scene{height:clamp(104px,21vh,188px)}
+/* The shop is the one screen with no vertical room to spare — five cards, four
+   stalls and a Leave button. The merchant stands to the side of the stock
+   instead of on top of it, and steps out of the way entirely when the screen
+   is too narrow to hold both. */
+.screen-shop .scenewrap{position:absolute;right:4px;top:2px;margin:0;
+  pointer-events:none;z-index:0}
+.screen-shop .scene{height:clamp(96px,17vh,152px)}
+@media (max-width:1080px){.screen-shop .scenewrap{display:none}}
 .title{font-family:var(--display);font-size:25px;text-align:center;letter-spacing:.09em;
   margin:6px 0 2px;color:var(--gold)}
 .title::after{content:"";display:block;width:140px;height:1px;margin:11px auto 0;
@@ -365,6 +395,10 @@ body.dragging #hand .slot:hover{transform:none !important}
 .cls{flex:1 1 320px;max-width:380px;padding:18px 20px;border:1px solid var(--line);
   border-radius:var(--r);background:var(--panel);text-align:left;transition:.14s}
 .cls:hover{border-color:var(--gold2);background:var(--panel2);transform:translateY(-2px)}
+.cls .cls-art{display:flex;justify-content:center;align-items:flex-end;height:100px;
+  margin-bottom:6px;filter:drop-shadow(0 8px 10px rgba(0,0,0,.55))}
+.cls .cls-art svg{animation:float 5s ease-in-out infinite}
+.cls:hover .cls-art svg{filter:drop-shadow(0 0 10px rgba(224,185,120,.35))}
 .cls .cls-name{font-family:var(--display);font-size:19px;color:var(--gold);letter-spacing:.05em}
 .cls .cls-name .k{color:var(--dim);margin-right:9px}
 .cls .cls-stats{margin:7px 0 10px;font-size:13px;color:var(--leaf)}

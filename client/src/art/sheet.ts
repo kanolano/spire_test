@@ -10,6 +10,9 @@
 import { mountArtDefs } from "./defs";
 import { creatureSvg, CREATURE_KEYS } from "./creatures";
 import { NODE_KINDS, nodeBadge } from "./nodes";
+import {
+  campfireScene, chestScene, endingScene, merchantScene, omenScene,
+} from "./scenes";
 import { RAMP_NAMES, RAMPS } from "./palette";
 
 export const artSheetRequested = () =>
@@ -74,6 +77,31 @@ export function renderArtSheet() {
   nh.style.cssText = "font:600 17px Georgia,serif;color:#e0b978;margin:34px 0 0";
   document.body.appendChild(nh);
   document.body.appendChild(nodes);
+
+  // The set pieces, which are otherwise only reachable by playing to them —
+  // a campfire is four floors and a fight away from a reload.
+  const sh = document.createElement("h2");
+  sh.textContent = "Set pieces";
+  sh.style.cssText = "font:600 17px Georgia,serif;color:#e0b978;margin:34px 0 0";
+  document.body.appendChild(sh);
+
+  const scenes = document.createElement("div");
+  scenes.style.cssText = "display:flex;gap:22px;flex-wrap:wrap;margin:16px 0 0";
+  scenes.innerHTML = ([
+    ["campfire", campfireScene()],
+    ["merchant", merchantScene()],
+    ["chest", chestScene()],
+    ["omen", omenScene()],
+    ["ascended", endingScene(true)],
+    ["died", endingScene(false)],
+  ] as const).map(([name, art]) => `
+    <div style="text-align:center">
+      <div style="display:grid;place-items:end center;width:200px;height:190px;
+                  padding:12px;border:1px solid #372f4a;border-radius:4px;
+                  background:linear-gradient(#181422,#100d18)">${art}</div>
+      <div style="font-size:11.5px;color:#9a8fb0;margin-top:6px">${name}</div>
+    </div>`).join("");
+  document.body.appendChild(scenes);
 
   // Height is set inline per creature so bosses read bigger; only the shared
   // presentation belongs here.

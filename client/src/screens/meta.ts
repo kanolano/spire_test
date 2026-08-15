@@ -1,7 +1,9 @@
 /** Character select, and the two run-ending screens. */
 
 import { abandon, send } from "../actions";
-import { ctaButton, el, esc } from "../dom";
+import { heroSvg } from "../art/heroes";
+import { endingScene } from "../art/scenes";
+import { ctaButton, el, esc, staggerIn } from "../dom";
 import { getRecords } from "../net";
 import { dailyMode, render, S, setDailyMode } from "../store";
 
@@ -14,7 +16,10 @@ export function renderSelect(st: HTMLElement) {
   (S().classes ?? []).forEach((c, i) => {
     const b = el("button", "cls");
     b.innerHTML =
-      `<div class="cls-name"><span class="k">${i + 1}</span>${esc(c.name)}</div>`
+      // You are choosing a body to climb in; it should be visible before the
+      // stat block explains it.
+      `<div class="cls-art">${heroSvg(c.key, 96)}</div>`
+      + `<div class="cls-name"><span class="k">${i + 1}</span>${esc(c.name)}</div>`
       + `<div class="cls-stats">${c.hp} HP<span>${c.energy} energy</span>`
       + `<span>${c.cards} cards in pool</span></div>`
       + `<div class="cls-blurb">${esc(c.blurb)}</div>`
@@ -23,6 +28,7 @@ export function renderSelect(st: HTMLElement) {
     b.onclick = () => void send({ type: "new_run", cls: c.key, daily: dailyMode });
     row.appendChild(b);
   });
+  staggerIn(row.children, 0.08, 0.06);
   st.appendChild(row);
 
   const toggle = ctaButton(
@@ -44,6 +50,7 @@ export function renderEnd(st: HTMLElement, won: boolean) {
   const s = S();
   st.appendChild(el("h1", "title big",
     won ? "You have ascended the Spire" : "You died"));
+  st.appendChild(el("div", "scenewrap", endingScene(won)));
   if (!won) {
     st.appendChild(el("div", "sub",
       `Slain by ${esc(s.killer)} on floor ${s.floor} of act ${s.act}.`));

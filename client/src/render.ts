@@ -116,7 +116,9 @@ export function render() {
   st.innerHTML = "";
   const changed = state.screen !== lastScreen;
   st.className = "screen-" + state.screen;
-  if (changed) { void st.offsetWidth; st.classList.add("enter"); }  // fade only between screens
+  // Every screen change used to be the same 0.22s fade, so leaving a shop and
+  // walking into a fight felt identical. Direction of travel now shows.
+  if (changed) { void st.offsetWidth; st.classList.add(transition(lastScreen, state.screen)); }
   setLastScreen(state.screen);
 
   if (state.banner) {
@@ -131,6 +133,20 @@ export function render() {
 
   hint();
   announceCombat();
+}
+
+/**
+ * Which way the screen moved.
+ *
+ * The map is the hub: everything else is somewhere you went *into* from it, so
+ * arriving at the map is coming back. The three screens that are not part of a
+ * climb at all — picking a class, and the two endings — do not travel; they
+ * settle.
+ */
+function transition(from: string | null, to: string): string {
+  if (!from || to === "select" || to === "gameover" || to === "win") return "enter-settle";
+  if (to === "map") return "enter-back";
+  return "enter-fwd";
 }
 
 function hint() {

@@ -6,7 +6,7 @@
 
 import { send } from "../actions";
 import * as art from "../art/registry";
-import { ctaButton, el, esc } from "../dom";
+import { ctaButton, el, esc, staggerIn } from "../dom";
 import { S } from "../store";
 import { cardEl, withUpgrade } from "../ui/card";
 
@@ -59,7 +59,7 @@ export function renderReward(st: HTMLElement) {
       onclick: () => void send({ type: "reward", what: "potion" }),
     }));
   }
-  if (items.children.length) st.appendChild(items);
+  if (items.children.length) { staggerIn(items.children); st.appendChild(items); }
 
   if (r.card_taken) {
     st.appendChild(el("div", "center ghost", "Card added to your deck."));
@@ -71,6 +71,9 @@ export function renderReward(st: HTMLElement) {
       kbd: i + 1,
       onclick: () => void send({ type: "reward", what: "card", idx: i }),
     })));
+    // Dealt after the relic and potion rows have landed, so the eye is led
+    // down the screen in the order the choices are made.
+    staggerIn(row.children, 0.06, 0.16);
     st.appendChild(row);
   }
 
@@ -121,6 +124,9 @@ export function renderChoose(st: HTMLElement) {
     if (ch.kind !== "upgrade" || !c.up) { row.appendChild(card); return; }
     row.appendChild(withUpgrade(card, c, go));
   });
+  // A whole deck can land here, so the step is short: 20 cards at 0.05s each
+  // would take a second to finish dealing.
+  staggerIn(row.children, 0.02);
   st.appendChild(row);
   if (ch.kind === "remove") {
     st.appendChild(ctaButton("Change my mind <kbd>Esc</kbd>",

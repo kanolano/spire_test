@@ -35,3 +35,20 @@ export function ctaButton(label: string, onclick: () => void, cls?: string) {
 }
 
 export const LETTERS = "abcdefgh";
+
+/**
+ * Deal a screen's contents in rather than having them all appear at once.
+ *
+ * The delay is set per node instead of by nth-child rules because the counts
+ * are not known here — a shop has as many rows as it has stock. Reduced motion
+ * is handled by the same global rule that flattens every other animation, so
+ * there is nothing to branch on.
+ */
+export function staggerIn(
+  nodes: Iterable<Element>, step = 0.05, base = 0.03,
+): void {
+  [...nodes].forEach((n, i) => {
+    n.classList.add("risein");
+    (n as HTMLElement).style.animationDelay = `${(base + i * step).toFixed(3)}s`;
+  });
+}
