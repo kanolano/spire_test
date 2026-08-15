@@ -17,6 +17,8 @@ def card_data(card, energy=None, idx=None):
     affordable = energy is None or card.cost == "X" or card.cost <= energy
     return {
         "i": idx,
+        # per-instance id: lets the client follow one card across renders
+        "uid": card.uid,
         "key": card.key,
         "name": card.name,
         "type": card.type,

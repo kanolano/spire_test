@@ -4,6 +4,7 @@ The integrity tests are cheap insurance: a card key typo'd into a class pool use
 to surface as a KeyError mid-run, on a seed you could not reproduce.
 """
 
+import json
 import os
 import unittest
 
@@ -437,15 +438,35 @@ class TestMonsterSmoke(unittest.TestCase):
                     cb.enemy_turns()
 
     def test_every_monster_is_drawable_by_the_browser_client(self):
-        """A missing sprite silently renders as a generic blob."""
+        """A missing sprite silently renders as a generic blob.
+
+        The client's art registry is bundled and evaluated at build time into
+        static/art-manifest.json, keyed by content id. This used to string-slice
+        app.js between two `const` declarations, which meant any refactor of the
+        client broke the Python suite for no real reason.
+        """
+        art = self._art_manifest()
+        for key in MONSTERS:
+            self.assertIn(key, art["creatures"], f"{key} has no sprite")
+
+    def test_every_relic_and_potion_is_drawable(self):
+        art = self._art_manifest()
+        for key in RELICS:
+            self.assertIn(key, art["relics"], f"{key} has no icon")
+        for key in POTIONS:
+            self.assertIn(key, art["potions"], f"{key} has no icon")
+
+    @staticmethod
+    def _art_manifest():
         here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        path = os.path.join(here, "spire_of_ash", "web", "static", "app.js")
+        path = os.path.join(here, "spire_of_ash", "web", "static",
+                            "art-manifest.json")
+        if not os.path.isfile(path):
+            raise unittest.SkipTest(
+                "static/art-manifest.json is missing — run `npm run build` in "
+                "client/ to regenerate the browser client")
         with open(path, encoding="utf-8") as f:
-            js = f.read()
-        sprites = js[js.index("const SPRITE"):js.index("const RELIC_ICON")]
-        for spec in MONSTERS.values():
-            self.assertIn(f'"{spec["name"]}"', sprites,
-                          f'{spec["name"]} has no sprite')
+            return json.load(f)
 
     def test_each_act_offers_a_decent_spread_of_fights(self):
         for act, pools in ACT_POOLS.items():

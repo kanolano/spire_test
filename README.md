@@ -1,7 +1,7 @@
 # Spire of Ash
 
-A roguelike deckbuilder in the spirit of Slay the Spire. Pure Python standard
-library — nothing to install, no build step, no JavaScript framework.
+A roguelike deckbuilder in the spirit of Slay the Spire. The engine and server
+are pure Python standard library — **playing it needs nothing but Python 3.10+**.
 
 ## Running
 
@@ -62,9 +62,31 @@ run.pending        what the run is waiting for right now
 | `spire_of_ash/engine/` | Rules: cards, combatants, combat, the `Run` state machine, map generation |
 | `spire_of_ash/content/` | Data tables: cards, monsters, relics, potions, events, classes |
 | `spire_of_ash/balance.py` | Every tuning number, in one place |
-| `spire_of_ash/web/` | HTTP server, per-session runs, view model, browser client |
+| `spire_of_ash/web/` | HTTP server, per-session runs, view model, built client |
 | `spire_of_ash/term/` | Terminal client and all ANSI rendering |
+| `client/` | Browser client source (TypeScript). Only needed to *change* the UI |
 | `tests/` | Rules, flow, persistence, content integrity and HTTP tests |
+
+## Working on the browser client
+
+`spire_of_ash/web/static/` is build output and is committed, which is why
+running the game needs no toolchain. Editing the UI does:
+
+```sh
+cd client
+npm install
+npm run dev      # http://localhost:5173, hot reload, proxies the API to 8765
+npm run build    # typecheck, then rebuild spire_of_ash/web/static
+```
+
+Run `python3 -m spire_of_ash.web` alongside `npm run dev` — the dev server
+proxies `/state`, `/action` and friends to it. **Commit the rebuilt `static/`
+along with your source change**, or players get the previous UI.
+
+The build also emits `static/art-manifest.json`, listing every sprite the
+client can draw. `tests/test_content.py` checks it against the content tables,
+so a monster added without art fails the suite rather than quietly rendering as
+a generic blob.
 
 Where a card needs a choice the player has to make (True Grit+ picking a card to
 exhaust), the client sends that choice with the action — `Card.requires` says

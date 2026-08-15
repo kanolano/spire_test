@@ -20,7 +20,7 @@ spire-web = "spire_of_ash.web.app:main"
 include = ["spire_of_ash*"]
 
 [tool.setuptools.package-data]
-"spire_of_ash.web" = ["static/*"]
+"spire_of_ash.web" = ["static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

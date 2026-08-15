@@ -554,6 +554,9 @@ class Run:
                 "label": cb.label, "kind": cb.kind, "turn": cb.turn + 1,
                 "energy": cb.energy,
                 "enemies": [{
+                    # the content id, so client art keys off the table rather
+                    # than the display name
+                    "key": e.key,
                     "name": e.name, "hp": max(0, e.hp), "max_hp": e.max_hp,
                     "block": e.block, "alive": e.alive, "statuses": e.statuses(),
                     "intent": e.intent_preview(p) if e.alive else None,

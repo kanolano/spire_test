@@ -1,0 +1,102 @@
+/**
+ * The art registry — the single source of truth for what the client can draw.
+ *
+ * `manifest()` is evaluated at build time by the art-manifest Vite plugin and
+ * written to static/art-manifest.json, which tests/test_content.py checks
+ * against the Python content tables. Keys here are **content ids**, not display
+ * names, so renaming a monster in the tables cannot orphan its art.
+ *
+ * Phase 0 keeps the emoji the previous client used, so the port is visually
+ * identical. Phase 3 replaces CREATURES with rigged SVG.
+ */
+
+export const CREATURES: Record<string, string> = {
+  jaw_worm: "🪱",
+  cultist: "🧙",
+  louse: "🐜",
+  fungi: "🍄",
+  acid_slime: "🟢",
+  spike_slime: "🔵",
+  small_slime: "🫧",
+  mad_gremlin: "👺",
+  sneaky_gremlin: "🗡️",
+  fat_gremlin: "👹",
+  shield_gremlin: "🛡️",
+  sentry: "🗿",
+  byrd: "🦅",
+  chosen: "🧛",
+  mystic: "🧝",
+  ash_pup: "🐺",
+  slag_golem: "🗿",
+  cinder_moth: "🦋",
+  bone_picker: "🦤",
+  gremlin_nob: "👺",
+  lagavulin: "🐛",
+  book_of_stabbing: "📕",
+  taskmaster: "🪓",
+  guardian: "🤖",
+  hexaghost: "👻",
+  slime_boss: "🟩",
+  champ: "⚔️",
+  ash_warden: "🛡️",
+  ashen_sovereign: "👑",
+};
+
+export const RELICS: Record<string, string> = {
+  burning_blood: "🩸",
+  bag_of_marbles: "🔮",
+  anchor: "⚓",
+  vajra: "🔱",
+  oddly_smooth_stone: "🥚",
+  bronze_scales: "⚖️",
+  blood_vial: "🧪",
+  lantern: "🏮",
+  happy_flower: "🌼",
+  pen_nib: "🖋️",
+  strawberry: "🍓",
+  meat_on_bone: "🍖",
+  kunai: "🗡️",
+  bag_of_prep: "🎒",
+  art_of_war: "📜",
+  ash_phial: "⚱️",
+  emberheart: "🫀",
+  ashglass_vial: "🫙",
+  smoulder_stone: "🪨",
+  grave_ash: "⚰️",
+  bone_dice: "🎲",
+  oathkeeper: "🕯️",
+  hollow_lantern: "🏮",
+};
+
+export const POTIONS: Record<string, string> = {
+  fire: "🔥",
+  block: "🛡️",
+  strength: "💪",
+  energy: "⚡",
+  swift: "💨",
+  explosive: "💥",
+  weak: "🌀",
+  fear: "😱",
+  blood: "🩸",
+};
+
+export const FALLBACK = { creature: "👾", relic: "◈", potion: "🧪" } as const;
+
+export function creature(key: string): string {
+  return CREATURES[key] ?? FALLBACK.creature;
+}
+export function relic(key: string): string {
+  return RELICS[key] ?? FALLBACK.relic;
+}
+export function potion(key: string): string {
+  return POTIONS[key] ?? FALLBACK.potion;
+}
+
+/** Read at build time by the art-manifest plugin. */
+export function manifest() {
+  return {
+    creatures: Object.keys(CREATURES),
+    relics: Object.keys(RELICS),
+    potions: Object.keys(POTIONS),
+  };
+}
