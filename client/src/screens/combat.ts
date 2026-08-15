@@ -13,6 +13,7 @@
  */
 
 import { send } from "../actions";
+import { backdropSvg } from "../art/backdrop";
 import { heroSvg } from "../art/heroes";
 import * as art from "../art/registry";
 import { el, esc, LETTERS, tipAttrs } from "../dom";
@@ -101,6 +102,9 @@ export function mountCombat(stage: HTMLElement) {
   // one thing hitting another.
   const field = el("div");
   field.id = "field";
+  const scenery = el("div", "backdrop-wrap");
+  scenery.innerHTML = backdropSvg(state.act, cb.kind);
+  field.appendChild(scenery);
   const hero = el("div", "hero-side");
   const heroBody = el("div", "foe-body");
   const heroPose = el("div", "foe-pose");

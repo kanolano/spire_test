@@ -174,7 +174,15 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 /* The player stands on the left facing the enemies on the right, so a swing
    reads as one body hitting another rather than a monster attacking a bar. */
 #field{display:flex;align-items:flex-end;justify-content:center;gap:28px;flex:1;
-  min-height:210px;margin:2px 0 10px;padding-bottom:6px}
+  min-height:210px;margin:2px 0 10px;padding-bottom:6px;position:relative}
+/* The room. Sits behind the fighters and is masked to nothing at the edges so
+   it reads as depth rather than as a panel with a border. */
+.backdrop-wrap{position:absolute;inset:-40px -80px -10px;z-index:0;pointer-events:none;
+  overflow:hidden;opacity:.9;
+  -webkit-mask-image:radial-gradient(75% 78% at 50% 72%,#000 20%,transparent 82%);
+  mask-image:radial-gradient(75% 78% at 50% 72%,#000 20%,transparent 82%)}
+.backdrop-wrap svg{width:100%;height:100%;display:block}
+#field > .hero-side,#field > #enemies{position:relative;z-index:1}
 /* The padding is a ground line: enemies carry a name and an HP bar under
    their sprite, so without it the two sides stand on different floors. */
 .hero-side{width:190px;text-align:center;flex:0 0 auto;position:relative;
