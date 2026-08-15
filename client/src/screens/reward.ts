@@ -4,8 +4,11 @@
  * stays put until you say you are done.
  */
 
+import { gsap } from "gsap";
+
 import { send } from "../actions";
 import * as art from "../art/registry";
+import { reducedMotion } from "../director";
 import { ctaButton, el, esc, staggerIn } from "../dom";
 import { S } from "../store";
 import { cardEl, withUpgrade } from "../ui/card";
@@ -18,12 +21,51 @@ interface RowOpts {
   kbd: string;
   taken: boolean;
   blocked?: string | null;
-  onclick: () => void;
+  /** Which tray it joins, and what to send. */
+  what: "relic" | "potion";
+}
+
+/**
+ * Take a relic or a potion, and watch it go where it now lives.
+ *
+ * Claiming used to be a row quietly re-rendering as "Taken", which said
+ * nothing about where the thing went — the top bar tray it joins is the one
+ * place the player has to learn to look.
+ */
+function claim(icon: HTMLElement, tray: string, done: () => void) {
+  const target = document.querySelector(tray);
+  if (reducedMotion() || !target) { done(); return; }
+
+  const from = icon.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
+  const fly = icon.cloneNode(true) as HTMLElement;
+  fly.style.cssText = `position:fixed;left:${from.left}px;top:${from.top}px;`
+    + `width:${from.width}px;height:${from.height}px;z-index:95;pointer-events:none;`
+    + `filter:drop-shadow(0 0 8px rgba(224,185,120,.7))`;
+  document.body.appendChild(fly);
+
+  gsap.to(fly, {
+    duration: 0.46,
+    x: to.left + to.width / 2 - (from.left + from.width / 2),
+    // The tray fills left to right, so aim at its right-hand end.
+    y: to.top + to.height / 2 - (from.top + from.height / 2),
+    scale: 0.8, ease: "power2.inOut",
+    onComplete: () => { fly.remove(); done(); },
+  });
+}
+
+/** Claim by keyboard or by button; both fly the sigil to its tray. */
+export function takeReward(what: "relic" | "potion") {
+  const icon = document.querySelector<HTMLElement>(`.rico[data-claim="${what}"]`);
+  const go = () => void send({ type: "reward", what });
+  if (icon) claim(icon, what === "relic" ? "#s-relics" : "#s-potions", go);
+  else go();
 }
 
 function rewardRow(icon: string, name: string, desc: string, opts: RowOpts) {
   const row = el("div", "item reward-row");
-  row.innerHTML = `<span class="rico" aria-hidden="true">${icon}</span>`
+  row.innerHTML = `<span class="rico" data-claim="${opts.what}" aria-hidden="true">`
+    + `${icon}</span>`
     + `<span class="nm">${esc(name)}</span><span class="ds">${esc(desc)}</span>`;
   if (opts.taken) {
     row.appendChild(el("span", "ghost taken", "Taken"));
@@ -31,7 +73,7 @@ function rewardRow(icon: string, name: string, desc: string, opts: RowOpts) {
     return row;
   }
   const b = el("button", "buy", `Take <kbd>${opts.kbd}</kbd>`);
-  b.onclick = opts.onclick;
+  b.onclick = () => takeReward(opts.what);
   if (opts.blocked) { b.disabled = true; b.title = opts.blocked; }
   row.appendChild(b);
   return row;
@@ -48,15 +90,13 @@ export function renderReward(st: HTMLElement) {
   const items = el("div", "rewards");
   if (r.relic) {
     items.appendChild(rewardRow(art.relic(r.relic.key), r.relic.name, r.relic.desc, {
-      kbd: "R", taken: r.relic_taken,
-      onclick: () => void send({ type: "reward", what: "relic" }),
+      kbd: "R", taken: r.relic_taken, what: "relic",
     }));
   }
   if (r.potion) {
     items.appendChild(rewardRow(art.potion(r.potion.key), r.potion.name, r.potion.desc, {
-      kbd: "P", taken: r.potion_taken,
+      kbd: "P", taken: r.potion_taken, what: "potion",
       blocked: r.potions_full ? "Your potion slots are full" : null,
-      onclick: () => void send({ type: "reward", what: "potion" }),
     }));
   }
   if (items.children.length) { staggerIn(items.children); st.appendChild(items); }

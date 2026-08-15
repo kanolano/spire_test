@@ -273,6 +273,15 @@ body.dragging #hand .slot:hover{transform:none !important}
   background:linear-gradient(180deg,#c9584a,#8d2f24)}
 .foe .fnum{position:absolute;inset:0;font-size:11px;line-height:12px;letter-spacing:.02em;
   text-shadow:0 1px 2px #000}
+/* The lagging bar. Both fills are set to the same width; this one is slower
+   and starts later, so the strip left behind is exactly the damage just taken
+   — and a blow that landed while you were reading something else still leaves
+   a mark on the way down. */
+/* Specific enough to beat `.foe .fbar i` and `.hpfill`, which otherwise hand
+   the ghost the same fast transition as the live fill and it never lags. */
+.foe .fbar i.ghostfill,.hpwrap i.ghostfill{position:absolute;left:0;top:0;height:100%;
+  background:#ffb9a4;opacity:.5;
+  transition:width .55s cubic-bezier(.4,0,.2,1) .3s}
 .intent{display:inline-flex;align-items:center;gap:6px;margin-bottom:8px;padding:4px 12px;
   border-radius:2px;font-size:14px;position:relative;background:#1e1929;
   border:1px solid var(--line);font-family:var(--ui)}

@@ -341,6 +341,7 @@ function setHp(who: Who, hp: number, after: State) {
   if (who === "player") {
     const max = after.player.max_hp;
     scene.hpFill.style.width = Math.max(0, hp) / max * 100 + "%";
+    scene.hpGhost.style.width = scene.hpFill.style.width;
     scene.hpText.textContent = `${Math.max(0, hp)} / ${max}`;
     return;
   }
@@ -348,6 +349,7 @@ function setHp(who: Who, hp: number, after: State) {
   const max = after.combat?.enemies[who]?.max_hp;
   if (!foe || !max) return;
   foe.barFill.style.width = Math.max(0, hp) / max * 100 + "%";
+  foe.barGhost.style.width = foe.barFill.style.width;
   foe.barNum.textContent = `${Math.max(0, hp)} / ${max}`;
 }
 

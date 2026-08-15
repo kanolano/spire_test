@@ -40,6 +40,8 @@ export interface FoeNodes {
   body: HTMLElement;
   name: HTMLElement;
   barFill: HTMLElement;
+  /** Lags behind barFill, so a bite you did not see leaves a mark. */
+  barGhost: HTMLElement;
   barNum: HTMLElement;
   chips: HTMLElement;
 }
@@ -56,6 +58,7 @@ interface Scene {
   orb: HTMLElement;
   pname: HTMLElement;
   hpFill: HTMLElement;
+  hpGhost: HTMLElement;
   hpText: HTMLElement;
   piles: HTMLElement;
   endturn: HTMLButtonElement;
@@ -134,10 +137,12 @@ export function mountCombat(stage: HTMLElement) {
     const shadow = el("div", "shadow");
     const name = el("div", "fname");
     const bar = el("div", "fbar");
+    // The ghost is drawn first so the live fill paints over it; what shows is
+    // the strip between where the bar was and where it is now.
+    const barGhost = el("i", "ghostfill");
     const barFill = el("i");
     const barNum = el("span", "fnum");
-    bar.appendChild(barFill);
-    bar.appendChild(barNum);
+    bar.append(barGhost, barFill, barNum);
     const chips = el("div", "chips foe-chips");
 
     root.append(intent, body, shadow, name, bar, chips);
@@ -150,7 +155,7 @@ export function mountCombat(stage: HTMLElement) {
       if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); clickFoe(i); }
     });
     foesWrap.appendChild(root);
-    return { root, intent, sprite, body, name, barFill, barNum, chips };
+    return { root, intent, sprite, body, name, barFill, barGhost, barNum, chips };
   });
   field.appendChild(foesWrap);
   stage.appendChild(field);
@@ -164,9 +169,10 @@ export function mountCombat(stage: HTMLElement) {
   const pname = el("div", "pname");
   const hpwrap = el("div", "hpwrap");
   hpwrap.style.cssText = "width:230px;margin-top:5px";
+  const hpGhost = el("i", "ghostfill");
   const hpFill = el("i", "hpfill");
   const hpText = el("span", "hptext");
-  hpwrap.append(hpFill, hpText);
+  hpwrap.append(hpGhost, hpFill, hpText);
   pcol.append(pname, hpwrap);
   main.append(orb, pcol);
 
@@ -184,7 +190,7 @@ export function mountCombat(stage: HTMLElement) {
   stage.appendChild(hand);
 
   scene = {
-    stage, head, foes, bar, log, orb, pname, hpFill, hpText,
+    stage, head, foes, bar, log, orb, pname, hpFill, hpGhost, hpText,
     piles, endturn, hand, cards: new Map(),
     hero, heroBody, heroPlate, heroChips,
   };
@@ -227,6 +233,7 @@ export function updateCombat(state: State = S()) {
   scene.pname.innerHTML = esc(p.name)
     + (p.block ? `<span class="block-badge">${shieldMark()} ${p.block}</span>` : "");
   scene.hpFill.style.width = Math.max(0, p.hp) / p.max_hp * 100 + "%";
+  scene.hpGhost.style.width = scene.hpFill.style.width;
   scene.hpText.textContent = `${p.hp} / ${p.max_hp}`;
   scene.piles.innerHTML =
     `<button data-act="pile" data-pile="draw_pile">draw ${cb.draw}</button>`
@@ -277,6 +284,7 @@ function updateFoe(n: FoeNodes, e: EnemyView, i: number, targetable: boolean) {
     + esc(e.name)
     + (e.block ? `<span class="block-badge">${shieldMark()} ${e.block}</span>` : "");
   n.barFill.style.width = Math.max(0, e.hp) / e.max_hp * 100 + "%";
+  n.barGhost.style.width = n.barFill.style.width;
   n.barNum.textContent = `${Math.max(0, e.hp)} / ${e.max_hp}`;
   n.chips.innerHTML = e.statuses.map(statusChip).join("");
 
