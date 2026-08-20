@@ -39,6 +39,31 @@ GRAVE_ASH_STRENGTH = 2
 BONE_DICE_EVERY = 4
 OATHKEEPER_HEAL = 3
 
+# ── stances (Penitent) ──
+WRATH_MULT = 2                 # damage dealt and taken while in Wrath
+DIVINITY_MULT = 3              # damage dealt while in Divinity
+CALM_EXIT_ENERGY = 2           # energy refunded for leaving Calm
+DIVINITY_ENERGY = 3            # energy granted on entering Divinity
+MANTRA_FOR_DIVINITY = 10
+
+# ── coils (Stormbound) ──
+COIL_DAMAGE = 3                # damage per Coil at end of turn, before Focus
+FROST_BLOCK = 2                # Block per Frost at end of turn, before Focus
+COIL_CAP = 5                   # how many of either you can hold at once
+
+# ── the grave (Gravewright) ──
+PHYLACTERY_HP = 25             # HP you come back with when the phylactery breaks
+
+# ── hexes (Hexbinder) ──
+EVIL_WITHIN_STACKS = 3         # debuff stacks that make an enemy a target
+
+# ── class starter relics ──
+STORM_CELL_COILS = 1
+PRAYER_BEAD_MANTRA = 3
+GRAVEBELL_SOULFIRE = 1
+HEXING_THREAD_HEXBLOOM = 1
+BREWER_POTION_SLOTS = 5        # the Emberbrewer carries a deeper belt
+
 # ── map ──
 FLOORS_PER_ACT = 15
 TREASURE_FLOOR = 8

@@ -194,6 +194,25 @@ RELICS = {
         desc="Draw 1 extra card each turn, but start combat with 1 less Energy.",
         draw_bonus=lambda cb: 1,
         on_turn_start=_hollow_lantern),
+
+    # ── the five later climbers; each is a starting relic, so none of them
+    #    turns up as a drop ──
+    "storm_cell": dict(
+        name="Storm Cell", desc="At the start of each combat, gain 1 Coil.",
+        on_combat_start=lambda cb: cb.channel("stormcoil", B.STORM_CELL_COILS)),
+    "prayer_bead": dict(
+        name="Prayer Bead", desc="At the start of each combat, gain 3 Mantra.",
+        on_combat_start=lambda cb: cb.gain_mantra(B.PRAYER_BEAD_MANTRA)),
+    "gravebell": dict(
+        name="Gravebell",
+        desc="At the start of each combat, gain 1 Soulfire.",
+        on_combat_start=_combat_start_apply("soulfire", B.GRAVEBELL_SOULFIRE)),
+    "cracked_alembic": dict(
+        name="Cracked Alembic", desc="At the start of each combat, brew a random potion.",
+        on_combat_start=lambda cb: cb.brew(quiet_when_full=True)),
+    "hexing_thread": dict(
+        name="Hexing Thread", desc="At the start of each combat, gain 1 Hexbloom.",
+        on_combat_start=_combat_start_apply("hexbloom", B.HEXING_THREAD_HEXBLOOM)),
 }
 
 # Starting relics are handed out by class and never appear as drops.

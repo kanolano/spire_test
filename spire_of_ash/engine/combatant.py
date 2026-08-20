@@ -62,6 +62,15 @@ def damage_after_modifiers(attacker, base, target, str_mult=1,
         vulnerable = target.s("vulnerable") if target else 0
     if vulnerable:
         dmg = int(dmg * B.VULNERABLE_MULT)
+    # Stances cut both ways: the Penitent in Wrath hits twice as hard and is
+    # hit twice as hard, which is why the same two lines cover the player
+    # swinging and an enemy swinging back.
+    if attacker.s("divinity"):
+        dmg = int(dmg * B.DIVINITY_MULT)
+    elif attacker.s("wrath"):
+        dmg = int(dmg * B.WRATH_MULT)
+    if target is not None and target.s("wrath"):
+        dmg = int(dmg * B.WRATH_MULT)
     return max(0, dmg)
 
 
@@ -158,7 +167,8 @@ class Player(Combatant):
         self.deck = [Card(k) for k in d["deck"]]
         self.relics = [d["relic"]]
         self.potions = []
-        self.max_potions = B.MAX_POTIONS
+        # the Emberbrewer brews mid-combat, so it carries a deeper belt
+        self.max_potions = d.get("potions", B.MAX_POTIONS)
 
     def has(self, relic):
         return relic in self.relics

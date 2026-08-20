@@ -21,7 +21,9 @@ const RELIC_ICON = {
   "Happy Flower":"🌼","Pen Nib":"🖋️","Strawberry":"🍓","Meat on the Bone":"🍖",
   "Kunai":"🗡️","Bag of Preparation":"🎒","Art of War":"📜","Ash Phial":"⚱️",
   "Emberheart":"🫀","Ashglass Vial":"🫙","Smoulder Stone":"🪨","Grave Ash":"⚰️",
-  "Bone Dice":"🎲","Oathkeeper":"🕯️","Hollow Lantern":"🏮"
+  "Bone Dice":"🎲","Oathkeeper":"🕯️","Hollow Lantern":"🏮",
+  "Storm Cell":"🔋","Prayer Bead":"📿","Gravebell":"🔔","Cracked Alembic":"⚗️",
+  "Hexing Thread":"🧵"
 };
 const POTION_ICON = {
   "Fire Potion":"🔥","Block Potion":"🛡️","Strength Potion":"💪","Energy Potion":"⚡",

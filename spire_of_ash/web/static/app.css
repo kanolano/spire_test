@@ -251,7 +251,7 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .choice:disabled{opacity:.42;cursor:not-allowed}
 .choice .k{color:var(--gold);margin-right:11px;font-family:var(--display)}
 .classes{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:22px auto;
-  max-width:820px}
+  max-width:1180px}
 .cls{flex:1 1 320px;max-width:380px;padding:18px 20px;border:1px solid var(--line);
   border-radius:var(--r);background:var(--panel);text-align:left;transition:.14s}
 .cls:hover{border-color:var(--gold2);background:var(--panel2);transform:translateY(-2px)}
