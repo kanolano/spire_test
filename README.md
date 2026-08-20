@@ -46,6 +46,21 @@ relics and card removal, and `?` in-game lists every key binding.
 The browser UI is fully keyboard-driven — number keys play cards, `a`–`d` pick
 targets and map nodes, `e` ends the turn, `i` opens your deck.
 
+## The climbers
+
+Seven classes, each with its own deck, starting relic and card pools. What
+separates them is the resource they play around:
+
+| Class | HP | Plays around |
+| --- | --- | --- |
+| The Sentinel | 75 | Strength and Block, and brute arithmetic |
+| The Ashwalker | 68 | Poison, Weak and a great many small cuts |
+| The Stormbound | 70 | Coil and Frost, banked and spent at end of turn, scaled by Focus |
+| The Penitent | 72 | Stances — Wrath doubles damage dealt *and* taken, Calm refunds the energy you spend leaving it, ten Mantra spills into Divinity |
+| The Gravewright | 68 | The exhaust pile, as fuel rather than a graveyard |
+| The Emberbrewer | 66 | Potions brewed mid-fight, into a belt of its own size |
+| The Hexbinder | 66 | Weak, Vulnerable and Frail as the whole win condition |
+
 ## Architecture
 
 The engine is pure: it never reads stdin and never prints. Both front-ends are
@@ -91,8 +106,18 @@ since it mutates the player and draws from `run.rng` in the same pass. Statuses
 declare their own `(label, name, description)` in `spire_of_ash/statuses.py`, and
 both clients show the description on hover.
 
+A class is one row in `content/classes.py` — HP, energy, starting deck, starting
+relic and three card pools, plus an optional `potions` if it wants a belt of its
+own size. Nothing outside that table is class-aware, so the clients pick up a new
+climber with no change at all. A class that wants a mechanic the engine cannot
+express yet needs one more thing: a status in `statuses.py` and whichever hook
+fires it, which is how stances, Coil and the exhaust triggers arrived.
+
 `tests/test_content.py` walks every table, so a card key typo'd into a class pool
-fails the suite instead of crashing a run on a seed you cannot reproduce.
+fails the suite instead of crashing a run on a seed you cannot reproduce, and
+`tests/test_classes.py` goes further and plays every card in every pool, upgraded
+and not, against a live enemy — a typo inside an `fx` lambda is otherwise
+invisible until someone draws that card.
 
 Runs are seeded and serialisable, so they are reproducible, resumable across a
 server restart, and testable.
