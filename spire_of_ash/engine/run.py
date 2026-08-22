@@ -355,6 +355,15 @@ class Run:
             return
         self.open_choose("upgrade", "Choose a card to upgrade", opts, "map")
 
+    def _do_purge(self, action):
+        """Thin the deck. Card removal was 75 gold and once per shop, so a run
+        averaged well under one removal and the starter cards never left."""
+        self._need("rest")
+        if len(self.player.deck) <= B.MIN_DECK_SIZE:
+            raise InvalidAction("Your deck is already as thin as it will go.")
+        self.open_choose("remove", "Choose a card to purge",
+                         list(self.player.deck), "map")
+
     # ── card picker ──
     def open_choose(self, kind, title, cards, back, allow_skip=False):
         self.choose = {"kind": kind, "title": title, "back": back,
@@ -637,6 +646,7 @@ _HANDLERS = {
     "reward_done": Run._do_reward_done,
     "rest": Run._do_rest,
     "smith": Run._do_smith,
+    "purge": Run._do_purge,
     "choose": Run._do_choose,
     "shop_buy": Run._do_shop_buy,
     "shop_leave": Run._do_shop_leave,

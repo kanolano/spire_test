@@ -121,12 +121,15 @@ MONSTERS = {
         "Caw": mv("buff", fn=_grow(2)),
     }, pick=weighted_pick([("Peck", 50, 2), ("Swoop", 30, 2), ("Caw", 20, 1)])),
 
+    # A pair of these was landing 30+ in a turn *and* stacking Vulnerable, while
+    # Drain compounded their Strength — the damage came down rather than the
+    # debuffs, so the fight still plays as a nasty attrition puzzle.
     "chosen": dict(name="Chosen", hp=(50, 58), moves={
         "Hex": mv("debuff", fn=lambda cb, e: cb.add_card_to_pile(Card("regret"), True)),
-        "Zap": mv("attack", 18),
-        "Debilitate": mv("attack", 10, fn=_debuff("vulnerable", 2)),
+        "Zap": mv("attack", 12),
+        "Debilitate": mv("attack", 7, fn=_debuff("vulnerable", 2)),
         "Drain": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "weak", 3),
-                                                cb.apply(e, "strength", 3))),
+                                                cb.apply(e, "strength", 2))),
     }, pick=lambda e: "Hex" if e.turn == 0 else weighted_pick(
         [("Zap", 30, 2), ("Debilitate", 40, 2), ("Drain", 30, 1)])(e)),
 
@@ -135,6 +138,31 @@ MONSTERS = {
         "Attack Debuff": mv("attack", 9, fn=_debuff("weak", 2)),
         "Buff": mv("buff", fn=lambda cb, e: [cb.apply(x, "strength", 2) for x in cb.living()]),
     }, pick=weighted_pick([("Heal", 30, 1), ("Attack Debuff", 40, 2), ("Buff", 30, 1)])),
+
+    # Four commons whose job is variety: a pack that rewards sweeping damage, a
+    # predictable blocker that rewards reading intents, a chip-damage nuisance
+    # that clogs the deck, and a healer-of-itself that punishes slow removal.
+    "ash_pup": dict(name="Ash Pup", hp=(13, 17), moves={
+        "Nip": mv("attack", 5),
+        "Snarl": mv("buff", fn=_grow(2)),
+    }, pick=weighted_pick([("Nip", 70, 3), ("Snarl", 30, 1)])),
+
+    "slag_golem": dict(name="Slag Golem", hp=(36, 42), moves={
+        "Harden": mv("block", fn=_block(12)),
+        "Smash": mv("attack", 13),
+    }, pick=cycle_pick(["Harden", "Smash"])),
+
+    "cinder_moth": dict(name="Cinder Moth", hp=(21, 26), moves={
+        "Scald": mv("attack", 5, fn=_add_cards("burn", 1)),
+        "Dust": mv("debuff", fn=_debuff("weak", 2)),
+        "Flit": mv("block", fn=_block(6)),
+    }, pick=weighted_pick([("Scald", 45, 2), ("Dust", 30, 1), ("Flit", 25, 2)])),
+
+    "bone_picker": dict(name="Bone Picker", hp=(30, 36), moves={
+        "Rend": mv("attack", 4, hits=3),
+        "Carrion Feast": mv("buff", fn=lambda cb, e: (cb.heal(e, 8),
+                                                      cb.apply(e, "strength", 1))),
+    }, pick=weighted_pick([("Rend", 65, 2), ("Carrion Feast", 35, 1)])),
 
     # ── elites ──
     "gremlin_nob": dict(name="Gremlin Nob", hp=(82, 86), elite=True, moves={
@@ -164,9 +192,13 @@ MONSTERS = {
     }, pick=weighted_pick([("Scouring Wave", 35, 2), ("Whip", 40, 2), ("Rally", 25, 1)])),
 
     # ── bosses ──
-    "guardian": dict(name="The Guardian", hp=(240, 240), boss=True, moves={
+    # Act 1 was a wall, and the reason was spike damage rather than length: one
+    # unblocked Fierce Bash was 43% of a Sentinel's max HP. The big hits came
+    # down and some of the HP went back, so the fight is still long enough to
+    # need a plan without being decided by a single unlucky turn.
+    "guardian": dict(name="The Guardian", hp=(200, 200), boss=True, moves={
         "Charging Up": mv("block", fn=_block(9)),
-        "Fierce Bash": mv("attack", 32),
+        "Fierce Bash": mv("attack", 22),
         "Vent Steam": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "vulnerable", 2),
                                                      cb.apply(cb.player, "weak", 2))),
         "Whirlwind": mv("attack", 5, hits=4),
@@ -183,10 +215,11 @@ MONSTERS = {
         "Divider" if e.turn == 1 else
         ["Sear", "Tackle", "Sear", "Inferno", "Tackle", "Sear"][(e.turn - 2) % 6])),
 
-    "slime_boss": dict(name="Slime Boss", hp=(160, 160), boss=True, moves={
+    # Slam landed every third turn for half a Sentinel's max HP.
+    "slime_boss": dict(name="Slime Boss", hp=(155, 155), boss=True, moves={
         "Goop Spray": mv("debuff", fn=_add_cards("slimed", 3)),
         "Preparing": mv("block", fn=_block(15)),
-        "Slam": mv("attack", 38),
+        "Slam": mv("attack", 26),
     }, pick=cycle_pick(["Goop Spray", "Preparing", "Slam"])),
 
     "champ": dict(name="The Champ", hp=(300, 300), boss=True, moves={

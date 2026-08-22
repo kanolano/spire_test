@@ -87,6 +87,7 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .tbtn{padding:5px 12px;border:1px solid var(--line2);border-radius:var(--r);color:var(--dim);
   font-size:13px;background:#221c30;transition:.12s}
 .tbtn:hover{color:var(--gold);border-color:var(--gold2);background:#2b2440}
+.tbtn.danger:hover{color:#e58b7c;border-color:#7d3b47;background:#2a1620}
 
 /* ── layout & headings ───────────────────────────────────── */
 #stage{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;width:100%;max-width:1180px;
@@ -246,10 +247,11 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .choices{display:flex;flex-direction:column;gap:9px;max-width:640px;margin:16px auto}
 .choice{padding:13px 16px;border:1px solid var(--line);border-radius:var(--r);text-align:left;
   background:var(--panel);transition:.12s}
-.choice:hover{border-color:var(--gold2);background:var(--panel2)}
+.choice:hover:not(:disabled){border-color:var(--gold2);background:var(--panel2)}
+.choice:disabled{opacity:.42;cursor:not-allowed}
 .choice .k{color:var(--gold);margin-right:11px;font-family:var(--display)}
 .classes{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:22px auto;
-  max-width:820px}
+  max-width:1180px}
 .cls{flex:1 1 320px;max-width:380px;padding:18px 20px;border:1px solid var(--line);
   border-radius:var(--r);background:var(--panel);text-align:left;transition:.14s}
 .cls:hover{border-color:var(--gold2);background:var(--panel2);transform:translateY(-2px)}
@@ -272,6 +274,19 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
   padding:4px 13px;background:#1d1829;transition:.12s;white-space:nowrap}
 .item .buy:hover:not(:disabled){background:var(--gold);color:#151020}
 .item .buy:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── upgrade picker: the card, and what it becomes ──────── */
+.upstack{display:flex;flex-direction:column;align-items:center;gap:8px}
+.upto{width:var(--card-w);padding:8px 10px;border:1px solid var(--gold2);
+  border-radius:var(--r);background:#211a2c;cursor:pointer;transition:.12s}
+.upto:hover{background:#2b2237;border-color:var(--gold)}
+/* the deck view shows the same block, but there is nothing to click */
+.upto.static{cursor:default;border-color:var(--line2)}
+.upto.static:hover{background:#211a2c;border-color:var(--line2)}
+.upto .upname{font-family:var(--display);font-size:13px;color:var(--gold);
+  display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+.upto .upcost{font-size:11px;color:var(--leaf);font-family:var(--ui)}
+.upto .updesc{margin-top:5px;font-size:11.5px;line-height:1.45;color:#cbc4da}
 
 /* what an event choice actually costs, under its flavour label */
 .choice .preview{display:block;margin:5px 0 0 30px;font-size:12.5px;color:var(--dim);

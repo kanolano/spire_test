@@ -1,5 +1,6 @@
 """The HTTP layer: routing, validation, session isolation, resume."""
 
+import http.client
 import json
 import os
 import shutil
@@ -187,6 +188,57 @@ class TestSessions(WebTestCase):
         status, body, _ = c.request("/abandon", {})
         self.assertEqual(status, 200)
         self.assertEqual(body["floor"], 0)
+        # the Quit button's whole point: land back on character select
+        self.assertEqual(body["screen"], "select")
+        self.assertIn("classes", body)
+
+    def test_climbing_again_can_keep_the_class(self):
+        """"Climb again" used to send new_run with no class, silently
+        restarting whoever DEFAULT_CLASS is rather than who you played."""
+        c = self.client()
+        c.request("/action", {"type": "new_run", "cls": "ashwalker"})
+        _, body, _ = c.request("/action", {"type": "new_run", "cls": "ashwalker"})
+        self.assertEqual(body["player"]["cls"], "ashwalker")
+
+    def test_a_post_does_not_desync_a_kept_alive_connection(self):
+        """/abandon never read its body, and the server speaks HTTP/1.1: the
+        unread bytes became the next request line, so the click after Quit came
+        back 501 Unsupported method."""
+        conn = http.client.HTTPConnection("127.0.0.1", self.port)
+        try:
+            hdrs = {"Content-Type": "application/json"}
+            conn.request("POST", "/abandon", body="{}", headers=hdrs)
+            first = conn.getresponse()
+            first.read()
+            self.assertEqual(first.status, 200)
+            cookie = (first.getheader("Set-Cookie") or "").split(";")[0]
+
+            # same connection, as a browser would
+            conn.request("POST", "/action",
+                         body=json.dumps({"type": "new_run", "cls": "ashwalker"}),
+                         headers=dict(hdrs, Cookie=cookie))
+            second = conn.getresponse()
+            payload = json.loads(second.read())
+            self.assertEqual(second.status, 200)
+            self.assertEqual(payload["player"]["cls"], "ashwalker")
+        finally:
+            conn.close()
+
+    def test_a_refused_cross_origin_post_also_drains(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port)
+        try:
+            conn.request("POST", "/action", body=json.dumps({"type": "new_run"}),
+                         headers={"Content-Type": "application/json",
+                                  "Origin": "http://evil.example"})
+            first = conn.getresponse()
+            first.read()
+            self.assertEqual(first.status, 403)
+            conn.request("GET", "/state")
+            second = conn.getresponse()
+            second.read()
+            self.assertEqual(second.status, 200)
+        finally:
+            conn.close()
 
     def test_store_evicts_over_the_cap(self):
         store = SessionStore(directory=None, max_sessions=3)
@@ -304,6 +356,44 @@ class TestDto(unittest.TestCase):
         self.assertIn("desc", r["relic"])
         run.apply({"type": "reward", "what": "relic"})
         self.assertTrue(view(run)["reward"]["relic_taken"])
+
+    def test_the_upgrade_picker_ships_what_each_card_becomes(self):
+        run = Run("sentinel", seed=5)
+        run.screen = "rest"
+        run.apply({"type": "smith"})
+        cards = view(run)["choose"]["cards"]
+        self.assertTrue(cards)
+        strike = next(c for c in cards if c["key"] == "strike")
+        self.assertEqual(strike["desc"], "Deal 6 damage.")
+        self.assertEqual(strike["up"]["name"], "Strike+")
+        self.assertEqual(strike["up"]["desc"], "Deal 9 damage.")
+
+    def test_the_deck_view_answers_it_too(self):
+        """The picker is two clicks deep inside a campfire; the deck is one key."""
+        run = Run("sentinel", seed=5)
+        deck = view(run)["deck"]
+        self.assertTrue(all(c["up"] for c in deck), "every starter is upgradable")
+        bash = next(c for c in deck if c["key"] == "bash")
+        self.assertEqual(bash["up"]["desc"], "Deal 10 damage. Apply 3 Vulnerable.")
+
+    def test_an_already_upgraded_card_has_nothing_to_preview(self):
+        run = Run("sentinel", seed=5)
+        run.player.deck[0].upgrade()
+        upgraded = [c for c in view(run)["deck"] if c["upgraded"]]
+        self.assertTrue(upgraded)
+        self.assertTrue(all(c["up"] is None for c in upgraded))
+
+    def test_previewing_an_upgrade_does_not_apply_it(self):
+        run = Run("sentinel", seed=5)
+        run.screen = "rest"
+        run.apply({"type": "smith"})
+        view(run)
+        self.assertFalse(any(k.upgraded for k in run.player.deck))
+
+    def test_other_pickers_carry_no_upgrade_preview(self):
+        run = Run("sentinel", seed=5)
+        run.open_choose("remove", "Remove", list(run.player.deck), "map")
+        self.assertNotIn("up", view(run)["choose"]["cards"][0])
 
     def test_class_roster_only_ships_on_the_select_screen(self):
         picked = Run("sentinel", seed=1)

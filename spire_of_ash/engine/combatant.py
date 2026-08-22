@@ -45,13 +45,32 @@ class Combatant:
         self.alive = d["alive"]
 
 
-def damage_after_modifiers(attacker, base, target, str_mult=1):
-    """Strength, Weak and Vulnerable applied to a raw attack value."""
-    dmg = base + attacker.s("strength") * str_mult
+def damage_after_modifiers(attacker, base, target, str_mult=1,
+                           strength=None, vulnerable=None):
+    """Strength, Weak and Vulnerable applied to a raw attack value.
+
+    `strength` and `vulnerable` override what the combatants carry right now.
+    Only `intent_preview` passes them, to project the state the blow will
+    actually land in rather than the state as of this instant.
+    """
+    if strength is None:
+        strength = attacker.s("strength")
+    dmg = base + strength * str_mult
     if attacker.s("weak"):
         dmg = int(dmg * B.WEAK_MULT)
-    if target and target.s("vulnerable"):
+    if vulnerable is None:
+        vulnerable = target.s("vulnerable") if target else 0
+    if vulnerable:
         dmg = int(dmg * B.VULNERABLE_MULT)
+    # Stances cut both ways: the Penitent in Wrath hits twice as hard and is
+    # hit twice as hard, which is why the same two lines cover the player
+    # swinging and an enemy swinging back.
+    if attacker.s("divinity"):
+        dmg = int(dmg * B.DIVINITY_MULT)
+    elif attacker.s("wrath"):
+        dmg = int(dmg * B.WRATH_MULT)
+    if target is not None and target.s("wrath"):
+        dmg = int(dmg * B.WRATH_MULT)
     return max(0, dmg)
 
 
@@ -91,17 +110,35 @@ class Enemy(Combatant):
         self.intent = self.spec["pick"](self)
 
     def intent_preview(self, player):
-        """Structured intent for a client to render. None when nothing is set."""
+        """Structured intent for a client to render. None when nothing is set.
+
+        This number is what the player blocks against, so it has to be the
+        damage that will land, not the damage as of this instant. Two things
+        happen in between, and neither used to be accounted for:
+
+        * the player's decaying debuffs tick down at the end of their turn,
+          before any enemy acts, so a last stack of Vulnerable no longer
+          applies — the preview used to promise damage that never arrived;
+        * this enemy gains Strength from Ritual at the start of its own turn,
+          before it swings. A Cultist therefore hit for exactly its Ritual
+          value more than advertised, every turn, compounding.
+        """
         if not self.intent:
             return None
         m = self.moves[self.intent]
         kind = m["kind"]
         if kind == "attack":
             return {"kind": "attack",
-                    "damage": damage_after_modifiers(self, m["dmg"], player),
+                    "damage": damage_after_modifiers(
+                        self, m["dmg"], player,
+                        strength=self.s("strength") + self.s("ritual"),
+                        vulnerable=max(0, player.s("vulnerable") - 1) if player else 0),
                     "hits": m["hits"],
-                    "extra": bool(m["fn"])}
-        return {"kind": kind}
+                    "extra": bool(m["fn"]),
+                    "note": m["note"]}
+        # A non-attack intent used to be just its kind, so the client could only
+        # render "▲ buff" and the player had no idea what was coming.
+        return {"kind": kind, "note": m["note"]}
 
     # ── persistence ──
     def to_dict(self):
@@ -130,7 +167,8 @@ class Player(Combatant):
         self.deck = [Card(k) for k in d["deck"]]
         self.relics = [d["relic"]]
         self.potions = []
-        self.max_potions = B.MAX_POTIONS
+        # the Emberbrewer brews mid-combat, so it carries a deeper belt
+        self.max_potions = d.get("potions", B.MAX_POTIONS)
 
     def has(self, relic):
         return relic in self.relics

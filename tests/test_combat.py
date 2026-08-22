@@ -258,3 +258,131 @@ class TestLog(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEnemyTurnGuards(unittest.TestCase):
+    """An enemy that dies partway through the enemy phase must stop acting.
+
+    A multi-hit attacker killed by Thorns used to finish every remaining hit
+    after it was dead, so the player took damage from an enemy the screen was
+    already drawing as slain.
+    """
+
+    def test_a_dead_enemy_stops_mid_attack(self):
+        cb = make_combat(("guardian",))
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.intent = "Whirlwind"            # 5 damage, four hits
+        cb.player.st["thorns"] = 9999       # the first hit kills it
+        cb.player.block = 0
+        before = cb.player.hp
+        cb.enemy_turns()
+        self.assertFalse(foe.alive)
+        self.assertEqual(before - cb.player.hp, 5, "only the first hit lands")
+
+    def test_a_dead_enemy_does_not_fire_its_move_effect(self):
+        cb = make_combat(("guardian",))
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.intent = "Twin Slam"            # 8 x2, and grants itself Strength
+        cb.player.st["thorns"] = 9999
+        cb.enemy_turns()
+        self.assertFalse(foe.alive)
+        self.assertEqual(foe.s("strength"), 0, "a corpse does not buff itself")
+
+    def test_an_enemy_killed_by_another_does_not_take_its_turn(self):
+        cb = make_combat(("cultist", "cultist"))
+        cb.start_combat()
+        first, second = cb.enemies
+        for e in cb.enemies:
+            e.intent = "Dark Strike" if "Dark Strike" in e.moves else list(e.moves)[0]
+        # the first one's turn kills the second outright
+        cb.kill(second)
+        before = cb.player.hp
+        cb.enemy_turns()
+        self.assertLessEqual(cb.player.hp, before)
+        self.assertFalse(second.alive)
+
+
+class TestUnattributedDamage(unittest.TestCase):
+    """HP that vanishes at end of turn needs a line in the log to explain it."""
+
+    def test_burn_says_so(self):
+        cb = make_combat()
+        cb.start_combat()
+        cb.hand = [Card("burn")]
+        cb.player_turn_end()
+        self.assertTrue(any("Burn" in line for line in cb.log), cb.log)
+
+    def test_regret_says_so(self):
+        cb = make_combat()
+        cb.start_combat()
+        cb.hand = [Card("regret"), Card("strike")]
+        cb.player_turn_end()
+        self.assertTrue(any("Regret" in line for line in cb.log), cb.log)
+
+
+class TestIntentPreview(unittest.TestCase):
+    """The intent number is what the player blocks against, so it has to equal
+    the damage that actually lands — not the damage as of the instant it is
+    drawn. Ritual fired before the enemy swung and was never counted, so a
+    Cultist hit for its Ritual value more than advertised, every turn."""
+
+    def assertPredicts(self, setup, enemies=("cultist",), move="Dark Strike"):
+        cb = make_combat(enemies)
+        cb.start_combat()
+        cb.player_turn_start()
+        foe = cb.enemies[0]
+        foe.intent = move
+        setup(cb, foe)
+        preview = foe.intent_preview(cb.player)
+        shown = preview["damage"] * preview["hits"]
+        cb.player.block = 0
+        before = cb.player.hp
+        cb.player_turn_end()
+        cb.enemy_turns()
+        self.assertEqual(shown, before - cb.player.hp)
+
+    def test_plain_attack(self):
+        self.assertPredicts(lambda cb, e: None)
+
+    def test_ritual_strength_lands_before_the_blow(self):
+        self.assertPredicts(lambda cb, e: e.st.__setitem__("ritual", 3))
+
+    def test_a_last_stack_of_vulnerable_has_already_worn_off(self):
+        """It decays at the end of the player's turn, before any enemy acts."""
+        self.assertPredicts(lambda cb, e: cb.player.st.__setitem__("vulnerable", 1))
+
+    def test_vulnerable_that_survives_the_tick_still_counts(self):
+        self.assertPredicts(lambda cb, e: cb.player.st.__setitem__("vulnerable", 2))
+
+    def test_ritual_and_vulnerable_together(self):
+        self.assertPredicts(lambda cb, e: (e.st.__setitem__("ritual", 3),
+                                           cb.player.st.__setitem__("vulnerable", 2)))
+
+    def test_weak_on_the_attacker_still_applies(self):
+        """The enemy's own debuffs decay after it acts, so they do count."""
+        self.assertPredicts(lambda cb, e: e.st.__setitem__("weak", 2))
+
+    def test_strength(self):
+        self.assertPredicts(lambda cb, e: e.st.__setitem__("strength", 4))
+
+    def test_multi_hit(self):
+        self.assertPredicts(lambda cb, e: None, ("guardian",), "Whirlwind")
+
+    def test_multi_hit_against_a_vulnerable_player(self):
+        self.assertPredicts(lambda cb, e: cb.player.st.__setitem__("vulnerable", 2),
+                            ("guardian",), "Whirlwind")
+
+    def test_preview_does_not_mutate_anything(self):
+        cb = make_combat(("cultist",))
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.intent = "Dark Strike"
+        foe.st["ritual"] = 3
+        cb.player.st["vulnerable"] = 2
+        for _ in range(3):
+            foe.intent_preview(cb.player)
+        self.assertEqual(foe.s("strength"), 0)
+        self.assertEqual(foe.s("ritual"), 3)
+        self.assertEqual(cb.player.s("vulnerable"), 2)

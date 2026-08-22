@@ -36,7 +36,23 @@ def cards_data(cards, energy=None):
 
 
 def sorted_cards(cards):
-    return sorted((card_data(k) for k in cards), key=lambda d: (d["type"], d["name"]))
+    """The deck view. Carries upgrade previews so 'what does + do to this?' is
+    answerable from the deck screen, not only at the moment you commit to it."""
+    out = sorted((dict(card_data(k), up=upgrade_preview(k)) for k in cards),
+                 key=lambda d: (d["type"], d["name"]))
+    return out
+
+
+def upgrade_preview(card):
+    """What a card would become, computed without touching it.
+
+    The upgrade picker showed the cards as they are now, so choosing one meant
+    knowing every card's upgraded form by heart.
+    """
+    if not card.upgradable or card.upgraded:
+        return None
+    cost = card.ucost if card.ucost is not None else card.base_cost
+    return {"name": card.base_name + "+", "cost": cost, "desc": card.ud}
 
 
 def relic_dto(key):
@@ -139,8 +155,12 @@ def view(run):
         }
     if run.choose:
         ch = run.choose
+        cards = cards_data(ch["cards"])
+        if ch["kind"] == "upgrade":
+            cards = [dict(d, up=upgrade_preview(k))
+                     for d, k in zip(cards, ch["cards"])]
         st["choose"] = {"kind": ch["kind"], "title": ch["title"], "back": ch["back"],
-                        "allow_skip": ch["allow_skip"], "cards": cards_data(ch["cards"])}
+                        "allow_skip": ch["allow_skip"], "cards": cards}
     if run.shop:
         s = run.shop
         st["shop"] = {

@@ -4,6 +4,7 @@ The integrity tests are cheap insurance: a card key typo'd into a class pool use
 to surface as a KeyError mid-run, on a seed you could not reproduce.
 """
 
+import os
 import unittest
 
 from helpers import make_combat
@@ -94,12 +95,23 @@ class TestRelicHooks(unittest.TestCase):
             cb.player_attack(foe, 1)
         self.assertEqual(cb.player.s("dexterity"), 1)
 
-    def test_burning_blood_heals_after_combat(self):
+    def test_burning_blood_heals_after_an_elite_or_boss(self):
+        for kind in ("elite", "boss"):
+            cb = make_combat(kind=kind)
+            cb.player.relics = ["burning_blood"]
+            cb.player.hp = cb.player.max_hp - 20
+            before = cb.player.hp
+            cb.end_combat()
+            self.assertEqual(cb.player.hp, before + B.BURNING_BLOOD_ELITE_HEAL, kind)
+
+    def test_burning_blood_heals_less_after_trash(self):
+        """A flat 6 after every fight made a trash node cost nothing at all."""
         cb = self.relic_combat("burning_blood")
         cb.player.hp = cb.player.max_hp - 20
         before = cb.player.hp
         cb.end_combat()
         self.assertEqual(cb.player.hp, before + B.BURNING_BLOOD_HEAL)
+        self.assertLess(B.BURNING_BLOOD_HEAL, B.BURNING_BLOOD_ELITE_HEAL)
 
     def test_meat_on_bone_only_heals_below_half(self):
         cb = self.relic_combat("meat_on_bone")
@@ -404,3 +416,42 @@ class TestSeeds(unittest.TestCase):
         self.assertEqual(run.rng.seed, 12345)
         with self.assertRaises(InvalidAction):
             run.apply({"type": "new_run", "cls": "sentinel", "seed": "abc"})
+
+
+class TestMonsterSmoke(unittest.TestCase):
+    """Every monster has to survive a real turn, so a new one cannot crash a run
+    on a seed nobody can reproduce."""
+
+    def test_every_monster_takes_a_turn_cleanly(self):
+        for key in MONSTERS:
+            for act in (1, 2, 3):
+                cb = make_combat((key,))
+                cb.start_combat()
+                cb.player_turn_start()
+                foe = cb.enemies[0]
+                for move in foe.moves:          # force each move, not just the rolled one
+                    foe.intent = move
+                    foe.alive = True
+                    foe.hp = max(foe.hp, 1)
+                    cb.player.hp = cb.player.max_hp
+                    cb.enemy_turns()
+
+    def test_every_monster_is_drawable_by_the_browser_client(self):
+        """A missing sprite silently renders as a generic blob."""
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(here, "spire_of_ash", "web", "static", "app.js")
+        with open(path, encoding="utf-8") as f:
+            js = f.read()
+        sprites = js[js.index("const SPRITE"):js.index("const RELIC_ICON")]
+        for spec in MONSTERS.values():
+            self.assertIn(f'"{spec["name"]}"', sprites,
+                          f'{spec["name"]} has no sprite')
+
+    def test_each_act_offers_a_decent_spread_of_fights(self):
+        for act, pools in ACT_POOLS.items():
+            self.assertGreaterEqual(len(pools["weak"]), 6, f"act {act} weak pool")
+            self.assertGreaterEqual(len(pools["strong"]), 9, f"act {act} strong pool")
+            for kind in ("weak", "strong"):
+                groups = [tuple(g) for g in pools[kind]]
+                self.assertEqual(len(groups), len(set(groups)),
+                                 f"act {act} {kind} has a duplicate group")

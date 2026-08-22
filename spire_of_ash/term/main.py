@@ -245,6 +245,13 @@ def screen_choose(run, st):
     ch = st["choose"]
     print(c(f"\n  {ch['title']}\n", BOLD, YEL))
     print_cards(ch["cards"])
+    # picking an upgrade blind meant knowing every upgraded form by heart
+    for i, card in enumerate(ch["cards"], 1):
+        up = card.get("up")
+        if up:
+            cost = (f" (cost {card['cost']} → {up['cost']})"
+                    if up["cost"] != card["cost"] else "")
+            print(c(f"   {i}. becomes {up['name']}{cost} — {up['desc']}", GRY))
     tail = " / (s)kip" if ch["allow_skip"] else ""
     ans = prompt(c(f"\n  card #{tail} > ", YEL)).lower()
     if ans.isdigit() and 1 <= int(ans) <= len(ch["cards"]):
@@ -256,15 +263,22 @@ def screen_rest(run, st):
     clear()
     header(st)
     p = st["player"]
-    heal = max(1, int(p["max_hp"] * 0.3))
+    full = p["hp"] >= p["max_hp"]
+    heal = min(p["max_hp"] - p["hp"], max(1, int(p["max_hp"] * 0.3)))
     print(c("\n  A CAMPFIRE\n", BOLD, YEL))
-    print(f"  1. Rest — heal {heal} HP")
+    if full:
+        print(c(f"  1. Rest — you are already at {p['hp']}/{p['max_hp']}", GRY))
+    else:
+        print(f"  1. Rest — heal {heal} HP")
     print("  2. Smith — upgrade a card")
+    print("  3. Purge — remove a card from your deck")
     ans = prompt(c("\n  > ", YEL))
-    if ans == "1":
+    if ans == "1" and not full:
         return {"type": "rest"}
     if ans == "2":
         return {"type": "smith"}
+    if ans == "3":
+        return {"type": "purge"}
     return None
 
 
