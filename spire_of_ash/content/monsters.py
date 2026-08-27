@@ -164,6 +164,68 @@ MONSTERS = {
                                                       cb.apply(e, "strength", 1))),
     }, pick=weighted_pick([("Rend", 65, 2), ("Carrion Feast", 35, 1)])),
 
+    # ── expansion commons ──
+    # A darting chip-attacker (act 1), an armoured turtle that rewards reading
+    # its cycle (act 1/2), a heavy that grows Thorns as it defends (act 2), and a
+    # self-healing revenant that punishes a slow clock (act 3).
+    "ember_wisp": dict(name="Ember Wisp", hp=(12, 16), moves={
+        "Singe": mv("attack", 4, fn=_debuff("weak", 1)),
+        "Flicker": mv("block", fn=_block(5)),
+        "Flare": mv("attack", 7),
+    }, pick=weighted_pick([("Singe", 45, 2), ("Flare", 35, 2), ("Flicker", 20, 2)])),
+
+    "rust_crawler": dict(name="Rust Crawler", hp=(34, 40), moves={
+        "Plate Up": mv("block", fn=_block(10)),
+        "Gore": mv("attack", 11),
+        "Corrode": mv("attack", 6, fn=_add_cards("wound", 1)),
+    }, pick=cycle_pick(["Plate Up", "Gore", "Corrode"])),
+
+    "molten_sentinel": dict(name="Molten Sentinel", hp=(40, 46), moves={
+        "Forge Guard": mv("block", fn=lambda cb, e: (cb.gain_block(e, 10),
+                                                     cb.apply(e, "thorns", 2))),
+        "Overhead Swing": mv("attack", 14),
+        "Slag Spit": mv("attack", 6, fn=_add_cards("burn", 1)),
+    }, pick=weighted_pick([("Overhead Swing", 40, 2), ("Slag Spit", 30, 2),
+                           ("Forge Guard", 30, 2)])),
+
+    "cinder_revenant": dict(name="Cinder Revenant", hp=(48, 54), moves={
+        "Rake": mv("attack", 10, fn=_debuff("vulnerable", 1)),
+        "Feast on Ash": mv("buff", fn=lambda cb, e: (cb.heal(e, 10),
+                                                     cb.apply(e, "strength", 2))),
+        "Cinder Lash": mv("attack", 7, hits=2),
+    }, pick=lambda e: "Feast on Ash" if e.turn == 0 else weighted_pick(
+        [("Rake", 40, 2), ("Cinder Lash", 40, 2), ("Feast on Ash", 20, 1)])(e)),
+
+    # ── expansion commons, wave 2 ──
+    # A frail swarm-mite that clogs the deck (act 1), a spitter that stacks
+    # Poison and Frail (act 1/2), a shrieking flyer that softens you with Weak
+    # then dives (act 2), and a phase-shifting wraith that hides behind Block on
+    # a fixed cycle (act 3).
+    "ash_mite": dict(name="Ash Mite", hp=(8, 12), moves={
+        "Gnaw": mv("attack", 3, fn=_add_cards("wound", 1)),
+        "Skitter": mv("attack", 5),
+    }, pick=weighted_pick([("Gnaw", 45, 1), ("Skitter", 55, 3)])),
+
+    "bile_spitter": dict(name="Bile Spitter", hp=(30, 36), moves={
+        "Spit": mv("attack", 6, fn=_debuff("frail", 1)),
+        "Corrode": mv("attack", 4, fn=lambda cb, e: cb.apply(cb.player, "vulnerable", 1)),
+        "Fester": mv("buff", fn=_block(6)),
+    }, pick=weighted_pick([("Spit", 45, 2), ("Corrode", 35, 2), ("Fester", 20, 2)])),
+
+    "shriek_bat": dict(name="Shriek Bat", hp=(26, 32), moves={
+        "Screech": mv("debuff", fn=_debuff("weak", 2)),
+        "Dive": mv("attack", 13),
+        "Wingbeat": mv("attack", 3, hits=3),
+    }, pick=lambda e: "Screech" if e.turn == 0 else weighted_pick(
+        [("Dive", 45, 2), ("Wingbeat", 40, 2), ("Screech", 15, 1)])(e)),
+
+    "grave_wraith": dict(name="Grave Wraith", hp=(52, 60), moves={
+        "Phase Guard": mv("block", fn=lambda cb, e: (cb.gain_block(e, 14),
+                                                     cb.apply(e, "strength", 1))),
+        "Soul Rake": mv("attack", 12, fn=_debuff("frail", 2)),
+        "Wail": mv("attack", 8, fn=_add_cards("wound", 1)),
+    }, pick=cycle_pick(["Phase Guard", "Soul Rake", "Wail"])),
+
     # ── elites ──
     "gremlin_nob": dict(name="Gremlin Nob", hp=(82, 86), elite=True, moves={
         "Bellow": mv("buff", fn=_grow(3)),
@@ -190,6 +252,33 @@ MONSTERS = {
         "Whip": mv("attack", 14, fn=_debuff("weak", 2)),
         "Rally": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 2), cb.gain_block(e, 12))),
     }, pick=weighted_pick([("Scouring Wave", 35, 2), ("Whip", 40, 2), ("Rally", 25, 1)])),
+
+    # ── expansion elites ──
+    # An act-2 forge-warden that ramps Strength behind a wall of Thorns, and an
+    # act-3 colossus that stacks Metallicize and grinds you with multi-hits.
+    "forge_warden": dict(name="Forge Warden", hp=(112, 120), elite=True, moves={
+        "Bellows": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 3),
+                                                cb.gain_block(e, 8))),
+        "Molten Cleave": mv("attack", 16, fn=_add_cards("burn", 1)),
+        "Ember Ward": mv("block", fn=lambda cb, e: (cb.gain_block(e, 12),
+                                                    cb.apply(e, "thorns", 3))),
+    }, pick=lambda e: "Bellows" if e.turn == 0 else weighted_pick(
+        [("Molten Cleave", 50, 2), ("Ember Ward", 50, 2)])(e)),
+
+    "ashbound_colossus": dict(name="Ashbound Colossus", hp=(160, 172), elite=True, moves={
+        "Stone Fist": mv("attack", 10, hits=2),
+        "Fortify": mv("block", fn=lambda cb, e: (cb.gain_block(e, 16),
+                                                 cb.apply(e, "metallicize", 4))),
+        "Crushing Heel": mv("attack", 20, fn=_debuff("frail", 2)),
+    }, pick=cycle_pick(["Stone Fist", "Fortify", "Crushing Heel"])),
+
+    "emberfiend": dict(name="Emberfiend", hp=(120, 130), elite=True, moves={
+        "Conflagrate": mv("attack", 12, fn=_add_cards("burn", 2, to_draw=True)),
+        "Scorching Grasp": mv("attack", 9, fn=_debuff("weak", 2)),
+        "Kindle": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 2),
+                                               cb.apply(e, "ritual", 2))),
+    }, pick=lambda e: "Kindle" if e.turn == 0 else weighted_pick(
+        [("Conflagrate", 45, 2), ("Scorching Grasp", 55, 2)])(e)),
 
     # ── bosses ──
     # Act 1 was a wall, and the reason was spike damage rather than length: one
@@ -253,4 +342,19 @@ MONSTERS = {
         "Ashfall": mv("attack", 9, hits=3, fn=_debuff("vulnerable", 2)),
     }, pick=cycle_pick(["Sealing Gaze", "Sovereign's Reach", "Crown of Cinders",
                         "Ashfall", "Sovereign's Reach", "Immolate"])),
+
+    # A second act-3 finale, so the top of the Spire is not always the same
+    # fight. Where the Sovereign seals your draw and burns, the Warmother grinds:
+    # she armours up, spawns pressure with heavy multi-hits, and heals off her
+    # own rage — a race against a wall that hits back.
+    "cinder_warmother": dict(name="The Cinder Warmother", hp=(330, 330), boss=True, moves={
+        "Molten Bulwark": mv("block", fn=lambda cb, e: (cb.gain_block(e, 24),
+                                                        cb.apply(e, "thorns", 4))),
+        "Rain of Ash": mv("attack", 7, hits=4),
+        "Maternal Fury": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 5),
+                                                      cb.heal(e, 24))),
+        "Ashen Maul": mv("attack", 22, fn=_debuff("frail", 2)),
+        "Ember Wave": mv("attack", 10, fn=_add_cards("burn", 2, to_draw=True)),
+    }, pick=cycle_pick(["Molten Bulwark", "Rain of Ash", "Maternal Fury",
+                        "Ashen Maul", "Ember Wave", "Rain of Ash"])),
 }

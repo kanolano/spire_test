@@ -82,6 +82,50 @@ NODE_REST = 0.28
 NODE_EVENT = 0.40
 NODE_SHOP = 0.48
 
+# ── per-act map profiles ──
+# Each act used to draw the same fixed template — same length, same treasure and
+# rest floors, same node odds — so the three acts were structurally identical
+# and only the monster tables differed. A profile gives each act its own shape:
+# how tall it is, where its guaranteed floors sit, and how the node roll leans.
+#
+# The roll cutoffs are cumulative and share the ladder monster < shop < event <
+# rest < elite: a node rolls a uniform r in [0,1) and takes the first band it
+# falls under (see dungeon._roll_node). Later acts push `elite` up and `rest`
+# down, so the climb tightens as it rises. `elite_from` is the first floor an
+# elite (or super-elite) may appear on; `super_elite_from` gates the harder
+# elite variants where an act defines them.
+ACT_PROFILES = {
+    1: dict(
+        name="The Ashen Reach", theme="ash",
+        floors=15, treasure_floor=8, rest_floors=(6, 13),
+        elite_from=5, super_elite_from=None,
+        # gentle: elites rare, campfires common
+        node=dict(elite=0.12, rest=0.28, event=0.42, shop=0.50),
+        width=(2, 4),
+    ),
+    2: dict(
+        name="The Molten Works", theme="forge",
+        floors=16, treasure_floor=9, rest_floors=(7, 14),
+        elite_from=4, super_elite_from=11,
+        # tighter: more elites, fewer free rests, denser events
+        node=dict(elite=0.18, rest=0.24, event=0.40, shop=0.49),
+        width=(3, 4),
+    ),
+    3: dict(
+        name="The Sovereign's Crown", theme="crown",
+        floors=17, treasure_floor=10, rest_floors=(8, 15),
+        elite_from=3, super_elite_from=9,
+        # brutal: elites everywhere, campfires scarce, shops rare
+        node=dict(elite=0.24, rest=0.20, event=0.38, shop=0.45),
+        width=(3, 5),
+    ),
+}
+
+def act_profile(act):
+    """The map profile for an act, clamped to the final defined act."""
+    return ACT_PROFILES[min(max(act, 1), FINAL_ACT)]
+
+
 # ── rewards ──
 GOLD_REWARD = {"monster": (10, 20), "elite": (25, 35), "boss": (80, 100)}
 POTION_DROP_CHANCE = {"monster": 0.4, "other": 0.6}

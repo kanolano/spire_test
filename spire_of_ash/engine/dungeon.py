@@ -10,21 +10,33 @@ from .combatant import Enemy
 NODE_TYPES = ("monster", "elite", "event", "rest", "shop", "treasure", "boss")
 
 
-def generate_map(rng, floors_per_act=B.FLOORS_PER_ACT):
-    """Build one act's map: a column of nodes per floor, linked by edges."""
+def generate_map(rng, act=1):
+    """Build one act's map from its profile.
+
+    A profile (see balance.ACT_PROFILES) decides the act's height, where its
+    guaranteed treasure and campfire floors sit, how wide each floor may be, and
+    how the per-node roll leans. Every act shares the invariants the run and the
+    client rely on: floor 0 is combat, the top floor is a lone boss, and every
+    node on a floor is reachable from the one below.
+    """
+    prof = B.act_profile(act)
+    floors_per_act = prof["floors"]
+    lo_w, hi_w = prof["width"]
+    treasure_floor = prof["treasure_floor"]
+    rest_floors = set(prof["rest_floors"])
     floors = []
     last = floors_per_act - 1
     for f in range(floors_per_act):
         if f == last:
             types = ["boss"]
         elif f == 0:
-            types = ["monster"] * rng.randint(2, 3)
-        elif f == B.TREASURE_FLOOR:
-            types = ["treasure"] * rng.randint(2, 4)
-        elif f in (last - 1, B.MID_REST_FLOOR):
-            types = ["rest"] * rng.randint(2, 3)
+            types = ["monster"] * rng.randint(lo_w, min(lo_w + 1, hi_w))
+        elif f == treasure_floor:
+            types = ["treasure"] * rng.randint(lo_w, hi_w)
+        elif f == last - 1 or f in rest_floors:
+            types = ["rest"] * rng.randint(lo_w, min(lo_w + 1, hi_w))
         else:
-            types = [_roll_node(rng, f) for _ in range(rng.randint(2, 4))]
+            types = [_roll_node(rng, f, prof) for _ in range(rng.randint(lo_w, hi_w))]
         floors.append([dict(type=t, edges=[]) for t in types])
 
     for f in range(floors_per_act - 1):
@@ -32,15 +44,16 @@ def generate_map(rng, floors_per_act=B.FLOORS_PER_ACT):
     return floors
 
 
-def _roll_node(rng, floor):
+def _roll_node(rng, floor, prof):
+    n = prof["node"]
     r = rng.random()
-    if floor >= 5 and r < B.NODE_ELITE:
+    if floor >= prof["elite_from"] and r < n["elite"]:
         return "elite"
-    if floor >= 5 and r < B.NODE_REST:
+    if floor >= prof["elite_from"] and r < n["rest"]:
         return "rest"
-    if r < B.NODE_EVENT:
+    if r < n["event"]:
         return "event"
-    if r < B.NODE_SHOP:
+    if r < n["shop"]:
         return "shop"
     return "monster"
 
@@ -75,7 +88,8 @@ ACT_POOLS = {
         weak=[["cultist"], ["jaw_worm"], ["louse", "louse"],
               ["small_slime", "small_slime"], ["mad_gremlin", "sneaky_gremlin"],
               ["ash_pup", "ash_pup"], ["cinder_moth"], ["louse", "small_slime"],
-              ["ash_pup", "louse"]],
+              ["ash_pup", "louse"], ["ember_wisp", "ember_wisp"], ["rust_crawler"],
+              ["ash_mite", "ash_mite", "ash_mite"], ["ash_mite", "ember_wisp"]],
         strong=[["jaw_worm"], ["cultist", "louse"], ["fungi", "fungi"],
                 ["acid_slime"], ["spike_slime", "small_slime"],
                 ["louse", "louse", "louse"],
@@ -83,28 +97,37 @@ ACT_POOLS = {
                 ["acid_slime", "spike_slime"],
                 ["ash_pup", "ash_pup", "ash_pup"], ["slag_golem"],
                 ["cinder_moth", "ash_pup"], ["fungi", "louse", "louse"],
-                ["cinder_moth", "cinder_moth"], ["slag_golem", "ash_pup"]],
+                ["cinder_moth", "cinder_moth"], ["slag_golem", "ash_pup"],
+                ["rust_crawler", "ember_wisp"], ["ember_wisp", "ember_wisp", "ember_wisp"],
+                ["bile_spitter", "ash_mite"], ["rust_crawler", "ash_mite", "ash_mite"]],
         elite=["gremlin_nob", "lagavulin"], boss=["guardian", "slime_boss"]),
     2: dict(
         weak=[["byrd"], ["fungi", "fungi"], ["jaw_worm", "louse"], ["sentry"],
-              ["slag_golem"], ["bone_picker"], ["cinder_moth", "cinder_moth"]],
+              ["slag_golem"], ["bone_picker"], ["cinder_moth", "cinder_moth"],
+              ["molten_sentinel"], ["shriek_bat"], ["bile_spitter", "shriek_bat"]],
         strong=[["chosen"], ["mystic"], ["byrd", "byrd"], ["sentry", "sentry"],
                 ["chosen", "cultist"], ["mystic", "byrd"], ["acid_slime", "spike_slime"],
                 ["jaw_worm", "jaw_worm"],
                 ["bone_picker", "byrd"], ["slag_golem", "cinder_moth"],
                 ["sentry", "byrd"], ["mystic", "ash_pup", "ash_pup"],
-                ["bone_picker", "bone_picker"]],
-        elite=["taskmaster", "gremlin_nob"], boss=["hexaghost", "champ"]),
+                ["bone_picker", "bone_picker"], ["molten_sentinel", "cinder_moth"],
+                ["molten_sentinel", "slag_golem"], ["shriek_bat", "shriek_bat"],
+                ["bile_spitter", "molten_sentinel"]],
+        elite=["taskmaster", "gremlin_nob", "forge_warden", "emberfiend"],
+        boss=["hexaghost", "champ"]),
     3: dict(
         weak=[["chosen"], ["mystic"], ["sentry", "sentry"], ["byrd", "byrd"],
-              ["bone_picker", "bone_picker"], ["slag_golem", "slag_golem"]],
+              ["bone_picker", "bone_picker"], ["slag_golem", "slag_golem"],
+              ["cinder_revenant"], ["grave_wraith"]],
         strong=[["chosen", "chosen"], ["sentry", "sentry", "sentry"],
                 ["mystic", "chosen"], ["byrd", "byrd", "byrd"],
                 ["acid_slime", "acid_slime"], ["chosen", "mystic"],
                 ["bone_picker", "chosen"], ["slag_golem", "sentry", "sentry"],
-                ["byrd", "byrd", "cinder_moth"], ["bone_picker", "mystic"]],
-        elite=["book_of_stabbing", "taskmaster", "ash_warden"],
-        boss=["ashen_sovereign"]),
+                ["byrd", "byrd", "cinder_moth"], ["bone_picker", "mystic"],
+                ["cinder_revenant", "cinder_moth"], ["cinder_revenant", "molten_sentinel"],
+                ["grave_wraith", "shriek_bat"], ["grave_wraith", "cinder_revenant"]],
+        elite=["book_of_stabbing", "taskmaster", "ash_warden", "ashbound_colossus"],
+        boss=["ashen_sovereign", "cinder_warmother"]),
 }
 
 
@@ -114,6 +137,15 @@ def make_encounter(rng, act, kind, floor):
     if kind == "boss":
         return [Enemy(rng.choice(pool["boss"]), act, rng)], "BOSS"
     if kind == "elite":
-        return [Enemy(rng.choice(pool["elite"]), act, rng)], "ELITE"
+        elites = pool["elite"]
+        prof = B.act_profile(act)
+        sef = prof.get("super_elite_from")
+        # Deep in an act, elites are drawn from the tougher half of the pool —
+        # the entries an act lists last are its nastier ones (e.g. Book of
+        # Stabbing, Ash Warden). Early on, any elite is fair game.
+        if sef is not None and floor >= sef and len(elites) > 1:
+            elites = elites[len(elites) // 2:]
+            return [Enemy(rng.choice(elites), act, rng)], "SUPER-ELITE"
+        return [Enemy(rng.choice(elites), act, rng)], "ELITE"
     group = rng.choice(pool["weak"] if floor < 3 else pool["strong"])
     return [Enemy(k, act, rng) for k in group], "COMBAT"

@@ -40,7 +40,7 @@ class Run:
             self.rng = Rng(seed)
         self.player = Player(cls or DEFAULT_CLASS)
         self.act = 1
-        self.floors = generate_map(self.rng)
+        self.floors = generate_map(self.rng, self.act)
         self.cur_floor = -1
         self.cur_idx = 0
         self.visited = []
@@ -182,7 +182,7 @@ class Run:
 
     def next_act(self):
         self.act += 1
-        self.floors = generate_map(self.rng)
+        self.floors = generate_map(self.rng, self.act)
         self.cur_floor = -1
         self.cur_idx = 0
         self.visited = []
@@ -547,6 +547,8 @@ class Run:
                            for f in self.floors],
                 "cur_floor": self.cur_floor, "cur_idx": self.cur_idx,
                 "visited": self.visited, "reachable": self.reachable(),
+                "act_name": B.act_profile(self.act)["name"],
+                "act_theme": B.act_profile(self.act)["theme"],
             },
         }
         if cb:

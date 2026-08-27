@@ -13,7 +13,11 @@ const SPRITE = {
   "Mystic":"🧝","Gremlin Nob":"👺","Lagavulin":"🐛","Book of Stabbing":"📕",
   "Taskmaster":"🪓","The Guardian":"🤖","Hexaghost":"👻","Slime Boss":"🟩","The Champ":"⚔️",
   "Ash Warden":"🛡️","The Ashen Sovereign":"👑",
-  "Ash Pup":"🐺","Slag Golem":"🗿","Cinder Moth":"🦋","Bone Picker":"🦤"
+  "Ash Pup":"🐺","Slag Golem":"🗿","Cinder Moth":"🦋","Bone Picker":"🦤",
+  "Ember Wisp":"🔥","Rust Crawler":"🦂","Molten Sentinel":"🌋","Cinder Revenant":"👺",
+  "Forge Warden":"⚒️","Ashbound Colossus":"🗿",
+  "Ash Mite":"🐛","Bile Spitter":"🐸","Shriek Bat":"🦇","Grave Wraith":"👻",
+  "Emberfiend":"😈","The Cinder Warmother":"👹"
 };
 const RELIC_ICON = {
   "Burning Blood":"🩸","Bag of Marbles":"🔮","Anchor":"⚓","Vajra":"🔱",
@@ -259,6 +263,14 @@ function renderTop(){
   $("#s-act").textContent = `Act ${S.act}` + (S.floor>0?` · Floor ${S.floor}`:"");
   const pct = Math.max(0,p.hp)/p.max_hp*100;
   $("#s-hp").style.width = pct+"%";
+  // ghost sits at the higher of prev/current HP and drains down a beat later,
+  // so a hit shows its size on the bar rather than just snapping shorter
+  const ghost = $("#s-hpghost");
+  if(ghost){
+    const prevPct = prev && prev.player ? Math.max(0,prev.player.hp)/prev.player.max_hp*100 : pct;
+    ghost.style.width = Math.max(pct, prevPct) + "%";
+    requestAnimationFrame(()=>{ ghost.style.width = pct + "%"; });
+  }
   $("#s-hpwrap").classList.toggle("low", pct<35);
   $("#s-hptext").textContent = `${p.hp} / ${p.max_hp}`;
   $("#s-gold").innerHTML = `<span class="ic" style="color:var(--gold)">◉</span> ${p.gold}`;
@@ -326,7 +338,7 @@ function renderMap(st){
       const ends = `x1="${x(f,i)}" y1="${y(f)}" x2="${x(f+1,t)}" y2="${y(f+1)}"`;
       svg += `<line ${ends} stroke="#0b0812" stroke-width="${e.width + 2.5}"
                 stroke-linecap="round" opacity=".85"/>`
-          +  `<line ${ends} stroke="${e.stroke}" stroke-width="${e.width}"
+          +  `<line ${ends} class="${open?"edge-open":""}" stroke="${e.stroke}" stroke-width="${e.width}"
                 stroke-linecap="round"
                 ${e.dash ? `stroke-dasharray="${e.dash}"` : ""}
                 ${e.glow ? 'filter="url(#glow)"' : ""}/>`;
@@ -337,8 +349,10 @@ function renderMap(st){
     const seen = m.visited.some(v=>v[0]===f&&v[1]===i);
     const r = isBoss(f) ? 23 : 17;
     const fill = cur ? "url(#ncur)" : (seen ? "url(#nseen)" : "url(#ndisc)");
-    svg += `<g class="node${can?" can":""}"${can?` data-node="${i}"`:""}>`
+    svg += `<g class="node${can?" can":""}${isBoss(f)?" boss":""}"${can?` data-node="${i}"`:""}>`
         +  `<title>${k.t}${can?" — press "+LETTERS[i]:""}</title>`
+        +  (cur ? `<circle class="beacon" cx="${x(f,i)}" cy="${y(f)}" r="${r}" fill="none"
+                    stroke="#f3e2be" stroke-width="2" filter="url(#glow)"/>` : "")
         +  (can ? `<circle class="ring" cx="${x(f,i)}" cy="${y(f)}" r="${r+4}" fill="none"
                     stroke="${k.c}" stroke-width="1.5" filter="url(#glow)" opacity=".6"/>` : "")
         +  `<circle class="disc" cx="${x(f,i)}" cy="${y(f)}" r="${r}" fill="${fill}"
@@ -352,9 +366,9 @@ function renderMap(st){
         + `</g>`;
   }));
   svg += `</svg>`;
-  st.appendChild(el("h2","title","Choose your path"));
+  st.appendChild(el("h2","title", S.map.act_name || "Choose your path"));
   st.appendChild(el("div","sub", S.map.cur_floor<0
-      ? "The Spire waits. Pick a starting route."
+      ? `Act ${S.act} — the Spire waits. Pick a starting route.`
       : "Click a lit node, or press its letter."));
   const wrap = el("div"); wrap.id = "mapwrap"; wrap.innerHTML = svg;
   wrap.addEventListener("click", ev => {
@@ -377,7 +391,8 @@ function renderCombat(st){
 
   const foes = el("div"); foes.id = "enemies";
   cb.enemies.forEach((e,i) => {
-    const d = el("div","foe"+(e.alive?"":" dead")+(sel&&sel.mode==="target"&&e.alive?" targetable":""));
+    const d = el("div","foe"+(e.alive?"":" dead")+(sel&&sel.mode==="target"&&e.alive?" targetable":"")+
+      (e.alive && e.intent && e.intent.kind==="attack"?" threat":""));
     d.dataset.foe = i;
     const it = e.intent;
     // Non-attack intents used to read "▲ buff". The move's own name says far
@@ -419,15 +434,20 @@ function renderCombat(st){
   st.appendChild(foes);
 
   const bar = el("div"); bar.id = "playerbar";
+  const pPrev = prev && prev.player ? prev.player : null;
+  const pPct = Math.max(0,p.hp)/p.max_hp*100;
+  const pGhostPct = pPrev ? Math.max(pPct, Math.max(0,pPrev.hp)/pPrev.max_hp*100) : pPct;
+  const blockGrew = pPrev && p.block > pPrev.block;
   bar.innerHTML =
     `<div class="barlog">${cb.log.slice(-3).map(l=>`<div>${esc(l)}</div>`).join("")}</div>` +
     `<div class="barmain">
        <div class="orb">${p.energy}<span style="font-size:12px;opacity:.6">/${p.max_energy}</span></div>
        <div>
          <div class="pname">${esc(p.name)}
-           ${p.block?`<span class="block-badge">🛡 ${p.block}</span>`:""}</div>
-         <div class="hpwrap" style="width:230px;margin-top:5px">
-           <i class="hpfill" style="width:${Math.max(0,p.hp)/p.max_hp*100}%"></i>
+           ${p.block?`<span class="block-badge${blockGrew?" gain":""}">🛡 ${p.block}</span>`:""}</div>
+         <div class="hpwrap${pPct<35?" low":""}" style="width:230px;margin-top:5px">
+           <i class="hpghost" style="width:${pGhostPct}%"></i>
+           <i class="hpfill" style="width:${pPct}%"></i>
            <span class="hptext">${p.hp} / ${p.max_hp}</span></div>
        </div>
      </div>`;
@@ -440,6 +460,11 @@ function renderCombat(st){
      </div>`;
   bar.appendChild(right);
   st.appendChild(bar);
+  // drain the HP ghost down to the real value a beat after it mounts
+  requestAnimationFrame(()=>{
+    const g = bar.querySelector(".hpghost");
+    if(g) g.style.width = pPct + "%";
+  });
 
   const hand = el("div"); hand.id = "hand";
   if(cb.turn !== lastTurn){ hand.className = "deal"; lastTurn = cb.turn; }  // new hand only
@@ -462,6 +487,7 @@ function clickCard(i){
   const c = S.combat.hand[i];
   if(sel && sel.mode === "hand"){                     // picking a card to exhaust
     if(i === sel.idx) return;
+    flyCard(sel.idx);
     send({type:"play", idx:sel.idx, target:sel.target ?? null, exhaust:i});
     return;
   }
@@ -472,6 +498,7 @@ function clickCard(i){
   if(c.needs_hand && S.combat.hand.length > 1){
     sel = {kind:"card", idx:i, mode:"hand", target}; render(); return;
   }
+  flyCard(i);
   send({type:"play", idx:i, target, exhaust:null});
 }
 function clickPotion(i){
@@ -486,6 +513,7 @@ function clickFoe(i){
   if(sel.kind==="potion"){ send({type:"potion", idx:sel.idx, target:i}); return; }
   const c = S.combat.hand[sel.idx];
   if(c.needs_hand && S.combat.hand.length > 1){ sel={...sel, mode:"hand", target:i}; render(); return; }
+  flyCard(sel.idx);
   send({type:"play", idx:sel.idx, target:i, exhaust:null});
 }
 
@@ -519,6 +547,7 @@ function rewardRow(icon, name, desc, opts){
   if(opts.taken){
     row.appendChild(el("span","ghost taken","Taken"));
     row.classList.add("done");
+    if(opts.justTook && !prefersReducedMotion()) row.classList.add("just-took");
     return row;
   }
   const b = el("button","buy", `Take <kbd>${opts.kbd}</kbd>`);
@@ -534,17 +563,21 @@ function renderReward(st){
   if(r.log && r.log.length){
     st.appendChild(el("div","combatlog", r.log.map(esc).join("<br>")));
   }
-  st.appendChild(el("div","sub", `You find ${r.gold} gold.`));
+  const goldLine = el("div","sub");
+  goldLine.innerHTML = `You find <span id="goldcount" style="color:var(--gold)">${r.gold}</span> gold.`;
+  st.appendChild(goldLine);
+  countUp("goldcount", r.gold);
 
   const items = el("div","rewards");
+  const pr = prev && prev.reward ? prev.reward : {};
   if(r.relic){
     items.appendChild(rewardRow(RELIC_ICON[r.relic.name] || "◈", r.relic.name,
-      r.relic.desc, {kbd:"R", taken:r.relic_taken,
+      r.relic.desc, {kbd:"R", taken:r.relic_taken, justTook: r.relic_taken && !pr.relic_taken,
                      onclick:()=>send({type:"reward", what:"relic"})}));
   }
   if(r.potion){
     items.appendChild(rewardRow(POTION_ICON[r.potion.name] || "🧪", r.potion.name,
-      r.potion.desc, {kbd:"P", taken:r.potion_taken,
+      r.potion.desc, {kbd:"P", taken:r.potion_taken, justTook: r.potion_taken && !pr.potion_taken,
                       blocked: r.potions_full ? "Your potion slots are full" : null,
                       onclick:()=>send({type:"reward", what:"potion"})}));
   }
@@ -554,7 +587,7 @@ function renderReward(st){
     st.appendChild(el("div","center ghost","Card added to your deck."));
   }else{
     st.appendChild(el("div","center ghost","Choose one card to add to your deck"));
-    const row = el("div","row"); row.style.marginTop = "16px";
+    const row = el("div","row"); row.id = "reward-cards"; row.style.marginTop = "16px";
     r.cards.forEach((c,i) => row.appendChild(cardEl(c,{kbd:i+1,
       onclick:()=>send({type:"reward", what:"card", idx:i})})));
     st.appendChild(row);
@@ -815,6 +848,45 @@ function closeOverlay(){
   overlayConfirm = null;
 }
 
+/* ── card play animation ────────────────────────────────
+/* ── number count-up ────────────────────────────────────
+   Ticks an element's integer content up to a target over ~0.5s. Reduced motion
+   or a screen change under us lands the final value immediately. */
+const prefersReducedMotion = () =>
+  window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function countUp(id, target){
+  const node = document.getElementById(id);
+  if(!node) return;
+  if(prefersReducedMotion()){ node.textContent = target; return; }
+  const start = performance.now(), dur = 520;
+  node.textContent = "0";
+  function tick(now){
+    if(!document.getElementById(id)) return;
+    const t = Math.min(1, (now - start) / dur);
+    node.textContent = Math.round(target * (t*(2-t)));   // ease-out
+    if(t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ── card play animation ────────────────────────────────
+   The played card flies up off the hand before the next render removes it.
+   We clone the live element into a fixed-position node so the incoming hand's
+   reflow doesn't yank it. */
+function flyCard(idx){
+  if(prefersReducedMotion()) return;
+  const src = document.querySelector(`#hand .card:nth-child(${idx+1})`);
+  if(!src) return;
+  const r = src.getBoundingClientRect();
+  const fx = src.cloneNode(true);
+  fx.className = (src.className + " playfx").replace(/\bsel\b/g,"");
+  fx.style.cssText = `left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;margin:0`;
+  document.body.appendChild(fx);
+  src.style.opacity = "0";               // hide the original for the beat before re-render
+  setTimeout(()=>fx.remove(), 340);
+}
+
 /* ── floating damage numbers ────────────────────────────── */
 function floaters(){
   // only the render that follows a server response animates; selecting or
@@ -822,26 +894,63 @@ function floaters(){
   if(!pendingFx) return;
   pendingFx = false;
   if(!prev || !prev.combat || !S.combat) return;
+  const reduce = prefersReducedMotion();
   const stage = $("#stage");
   S.combat.enemies.forEach((e,i) => {
     const before = prev.combat.enemies[i]; if(!before) return;
     const d = Math.max(0, before.hp) - Math.max(0, e.hp);
     const node = document.querySelector(`.foe[data-foe="${i}"]`);
-    if(d > 0 && node) pop(node, `-${d}`, "dmg");
+    if(!node) return;
+    if(d > 0){
+      // magnitude relative to the enemy's own size: a hit taking a fifth of
+      // its bar reads as a crit, so it scales with the fight rather than a flat cutoff
+      const big = d >= Math.max(12, e.max_hp * 0.2);
+      pop(node, `-${d}`, "dmg" + (big ? " crit" : ""));
+      if(!reduce){
+        node.classList.remove("hit"); void node.offsetWidth; node.classList.add("hit");
+        setTimeout(()=>node.classList.remove("hit"), 360);
+      }
+    }
+    // just died this step: play the dissolve before the greyed .dead settles in
+    if(before.alive && !e.alive && !reduce){
+      node.classList.add("dying");
+      setTimeout(()=>node.classList.remove("dying"), 620);
+    }
   });
   const dp = prev.player.hp - S.player.hp, bar = $("#playerbar");
-  if(bar && dp > 0){ pop(bar, `-${dp}`, "dmg"); bar.classList.add("shake");
-    setTimeout(()=>bar.classList.remove("shake"), 320); }
+  if(bar && dp > 0){
+    pop(bar, `-${dp}`, "dmg" + (dp >= 12 ? " crit" : ""));
+    if(!reduce){
+      bar.classList.add("shake");
+      setTimeout(()=>bar.classList.remove("shake"), 320);
+      const flash = $("#hitflash");
+      if(flash){ flash.classList.remove("on"); void flash.offsetWidth; flash.classList.add("on");
+        setTimeout(()=>flash.classList.remove("on"), 420); }
+    }
+  }
   if(bar && dp < 0) pop(bar, `+${-dp}`, "heal");
   const db = S.player.block - prev.player.block;
   if(bar && db > 0) pop(bar, `+${db} 🛡`, "blk");
+  // energy changed: give the orb a heartbeat
+  const orb = document.querySelector(".orb");
+  if(orb && !reduce && S.player.energy !== prev.player.energy){
+    orb.classList.remove("pulse"); void orb.offsetWidth; orb.classList.add("pulse");
+    setTimeout(()=>orb.classList.remove("pulse"), 400);
+  }
+  // a new player turn just began (the enemies acted): sweep the turn banner
+  if(!reduce && S.combat.turn > prev.combat.turn){
+    const tb = $("#turnbanner");
+    if(tb){ tb.textContent = "Your turn";
+      tb.classList.remove("on"); void tb.offsetWidth; tb.classList.add("on");
+      setTimeout(()=>tb.classList.remove("on"), 1000); }
+  }
   function pop(node, text, cls){
     const r = node.getBoundingClientRect(), s = stage.getBoundingClientRect();
     const f = el("div","float "+cls, text);
     f.style.left = (r.left - s.left + r.width/2 - 12) + "px";
     f.style.top  = (r.top  - s.top  + 10) + "px";
     stage.appendChild(f);
-    setTimeout(()=>f.remove(), 1000);
+    setTimeout(()=>f.remove(), 1100);
   }
 }
 

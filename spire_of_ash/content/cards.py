@@ -1122,4 +1122,271 @@ CARDS = {
                           desc="Double every debuff on ALL enemies. Exhaust.",
                           udesc="Double every debuff on ALL enemies. Exhaust.",
                           fx=lambda cb, k, t: cb.double_debuffs()),
+
+    # ══ expansion: two new cards per class ══════════════════════════════════
+    # Each is built from the existing combat API and existing statuses, so the
+    # smoke test in tests/test_classes.py (which plays every pool card, upgraded
+    # and not) covers them without any engine change.
+
+    # ── Sentinel: Strength and Block ──
+    "guard_break": dict(name="Guard Break", type="ATTACK", cost=1, targeted=True,
+                        desc="Deal 7 damage. Gain 4 Block.",
+                        udesc="Deal 10 damage. Gain 6 Block.",
+                        fx=lambda cb, k, t: (cb.player_attack(t, k.v(7, 10)),
+                                             cb.gain_block(cb.player, k.v(4, 6)))),
+    "iron_resolve": dict(name="Iron Resolve", type="POWER", cost=2, rarity="uncommon",
+                         desc="Gain 2 Strength. At the end of your turn, gain 3 Block.",
+                         udesc="Gain 3 Strength. At the end of your turn, gain 4 Block.",
+                         fx=lambda cb, k, t: (cb.apply(cb.player, "strength", k.v(2, 3)),
+                                              cb.apply(cb.player, "metallicize", k.v(3, 4)))),
+
+    # ── Ashwalker: Poison, Weak and small cuts ──
+    "serrated_edge": dict(name="Serrated Edge", type="ATTACK", cost=1, targeted=True,
+                          desc="Deal 5 damage. Apply 2 Poison.",
+                          udesc="Deal 7 damage. Apply 3 Poison.",
+                          fx=lambda cb, k, t: (cb.player_attack(t, k.v(5, 7)),
+                                               cb.apply(t, "poison", k.v(2, 3)))),
+    "venom_spray": dict(name="Venom Spray", type="SKILL", cost=1, rarity="uncommon",
+                        desc="Apply 2 Poison and 1 Weak to ALL enemies.",
+                        udesc="Apply 3 Poison and 2 Weak to ALL enemies.",
+                        fx=lambda cb, k, t: [(cb.apply(e, "poison", k.v(2, 3)),
+                                              cb.apply(e, "weak", k.v(1, 2)))
+                                             for e in cb.living()]),
+
+    # ── Stormbound: Coil, Frost and Focus ──
+    "static_charge": dict(name="Static Charge", type="SKILL", cost=1,
+                          desc="Channel 1 Coil. Gain 4 Block.",
+                          udesc="Channel 2 Coil. Gain 5 Block.",
+                          fx=lambda cb, k, t: (cb.channel("stormcoil", k.v(1, 2)),
+                                               cb.gain_block(cb.player, k.v(4, 5)))),
+    "frost_nova": dict(name="Frost Nova", type="SKILL", cost=2, rarity="uncommon",
+                       desc="Channel 2 Frost. Gain 1 Focus.",
+                       udesc="Channel 3 Frost. Gain 2 Focus.",
+                       fx=lambda cb, k, t: (cb.channel("frostward", k.v(2, 3)),
+                                            cb.apply(cb.player, "focus", k.v(1, 2)))),
+
+    # ── Penitent: stances and Mantra ──
+    "still_mind": dict(name="Still Mind", type="SKILL", cost=1,
+                       desc="Gain 5 Block. Gain 2 Mantra.",
+                       udesc="Gain 7 Block. Gain 3 Mantra.",
+                       fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(5, 7)),
+                                            cb.gain_mantra(k.v(2, 3)))),
+    "wrath_strike": dict(name="Wrath Strike", type="ATTACK", cost=1, targeted=True,
+                         rarity="uncommon",
+                         desc="Deal 8 damage. Enter Wrath.",
+                         udesc="Deal 11 damage. Enter Wrath.",
+                         fx=lambda cb, k, t: (cb.player_attack(t, k.v(8, 11)),
+                                              cb.enter_stance("wrath"))),
+
+    # ── Gravewright: the exhaust pile as fuel ──
+    "ash_reclaim": dict(name="Ash Reclaim", type="SKILL", cost=1,
+                        desc="Gain 4 Block. Return 1 card from the exhaust pile to your hand.",
+                        udesc="Gain 6 Block. Return 1 card from the exhaust pile to your hand.",
+                        fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(4, 6)),
+                                             cb.reclaim(1))),
+    "pyre_burst": dict(name="Pyre Burst", type="ATTACK", cost=2, rarity="uncommon",
+                       desc="Exhaust the top 2 cards of your draw pile. "
+                            "Deal 9 damage to ALL enemies.",
+                       udesc="Exhaust the top 2 cards of your draw pile. "
+                             "Deal 13 damage to ALL enemies.",
+                       fx=lambda cb, k, t: (cb.mill(2),
+                                            [cb.player_attack(e, k.v(9, 13))
+                                             for e in cb.living()])),
+
+    # ── Emberbrewer: potions brewed mid-fight ──
+    "quick_distil": dict(name="Quick Distil", type="SKILL", cost=1,
+                         desc="Brew a random potion. Gain 4 Block.",
+                         udesc="Brew a random potion. Gain 6 Block.",
+                         fx=lambda cb, k, t: (cb.brew(quiet_when_full=True),
+                                              cb.gain_block(cb.player, k.v(4, 6)))),
+    "catalyst_flask": dict(name="Catalyst Flask", type="SKILL", cost=1, rarity="uncommon",
+                           exhaust=True,
+                           desc="Brew a random potion. Your next potion this turn is "
+                                "played twice. Exhaust.",
+                           udesc="Brew 2 random potions. Your next potion this turn is "
+                                 "played twice. Exhaust.",
+                           fx=lambda cb, k, t: (cb.brew(n=k.v(1, 2), quiet_when_full=True),
+                                                cb.apply(cb.player, "potency", 1))),
+
+    # ── Hexbinder: Weak, Vulnerable and Frail ──
+    "withering_gaze": dict(name="Withering Gaze", type="SKILL", cost=1, targeted=True,
+                           desc="Apply 2 Weak and 2 Frail.",
+                           udesc="Apply 3 Weak and 3 Frail.",
+                           fx=lambda cb, k, t: (cb.apply(t, "weak", k.v(2, 3)),
+                                                cb.apply(t, "frail", k.v(2, 3)))),
+    "doom_mark": dict(name="Doom Mark", type="ATTACK", cost=2, targeted=True,
+                      rarity="uncommon",
+                      desc="Deal 6 damage. Apply 2 Vulnerable. Apply 2 Weak.",
+                      udesc="Deal 9 damage. Apply 3 Vulnerable. Apply 3 Weak.",
+                      fx=lambda cb, k, t: (cb.player_attack(t, k.v(6, 9)),
+                                           cb.apply(t, "vulnerable", k.v(2, 3)),
+                                           cb.apply(t, "weak", k.v(2, 3)))),
+
+    # ══ expansion: one rare per class ═══════════════════════════════════════
+    # A rare is a build-defining swing. Same rule as above — existing API and
+    # statuses only, so the smoke test covers them.
+
+    # ── Sentinel: turn a wall into a weapon ──
+    "colossus_smash": dict(name="Colossus Smash", type="ATTACK", cost=2, targeted=True,
+                           rarity="rare",
+                           desc="Deal 10 damage plus damage equal to your Block.",
+                           udesc="Deal 14 damage plus damage equal to your Block.",
+                           fx=lambda cb, k, t: cb.player_attack(t, k.v(10, 14) + cb.player.block)),
+
+    # ── Ashwalker: an AoE the poison deck lacked ──
+    "toxic_barrage": dict(name="Toxic Barrage", type="ATTACK", cost=2, rarity="rare",
+                          exhaust=True,
+                          desc="Deal 8 damage to ALL enemies. Apply 4 Poison to ALL enemies. "
+                               "Exhaust.",
+                          udesc="Deal 11 damage to ALL enemies. Apply 6 Poison to ALL enemies. "
+                                "Exhaust.",
+                          fx=lambda cb, k, t: [(cb.player_attack(e, k.v(8, 11)),
+                                                cb.apply(e, "poison", k.v(4, 6)))
+                                               for e in cb.living()]),
+
+    # ── Stormbound: bank the storm on your terms ──
+    "overcharge": dict(name="Overcharge", type="SKILL", cost="X", rarity="rare",
+                       desc="Channel X Coil. Gain X Frost.",
+                       udesc="Channel X Coil. Gain X Frost. Gain 1 Focus.",
+                       fx=lambda cb, k, t: (cb.channel("stormcoil", cb.x_spent),
+                                            cb.channel("frostward", cb.x_spent),
+                                            cb.apply(cb.player, "focus", k.v(0, 1)))),
+
+    # ── Penitent: commit to the strike ──
+    "sacred_fury": dict(name="Sacred Fury", type="ATTACK", cost=2, targeted=True,
+                        rarity="rare",
+                        desc="Enter Wrath. Deal 9 damage. Gain 5 Vigour.",
+                        udesc="Enter Wrath. Deal 12 damage. Gain 8 Vigour.",
+                        fx=lambda cb, k, t: (cb.enter_stance("wrath"),
+                                             cb.player_attack(t, k.v(9, 12)),
+                                             cb.apply(cb.player, "vigour", k.v(5, 8)))),
+
+    # ── Gravewright: the exhaust pile made engine ──
+    "grave_pact": dict(name="Grave Pact", type="POWER", cost=2, rarity="rare",
+                       desc="Whenever a card is Exhausted, gain 1 Strength and draw 1 card.",
+                       udesc="Whenever a card is Exhausted, gain 2 Strength and draw 1 card.",
+                       fx=lambda cb, k, t: (cb.apply(cb.player, "soulforge", k.v(1, 2)),
+                                            cb.apply(cb.player, "ashenembrace", 1))),
+
+    # ── Emberbrewer: a burner that never cools ──
+    "master_brew": dict(name="Master Brew", type="POWER", cost=2, rarity="rare",
+                        desc="Whenever you brew a potion, gain 1 Strength. "
+                             "At the start of each turn, brew a random potion.",
+                        udesc="Whenever you brew a potion, gain 2 Strength. "
+                              "At the start of each turn, brew a random potion.",
+                        fx=lambda cb, k, t: (cb.apply(cb.player, "brewmaster", k.v(1, 2)),
+                                             cb.apply(cb.player, "alchemicalheart", 1))),
+
+    # ── Hexbinder: the whole board rots ──
+    "curse_eternal": dict(name="Curse Eternal", type="POWER", cost=2, rarity="rare",
+                          desc="Gain 2 Hexbloom. At the start of each turn, apply 1 Weak "
+                               "to ALL enemies.",
+                          udesc="Gain 3 Hexbloom. At the start of each turn, apply 1 Weak "
+                                "to ALL enemies.",
+                          fx=lambda cb, k, t: (cb.apply(cb.player, "hexbloom", k.v(2, 3)),
+                                               cb.apply(cb.player, "dreadaura", 1))),
+
+    # ══ expansion: a second common and uncommon per class ═══════════════════
+    # Existing API and statuses only; the smoke test plays each of these too.
+
+    # ── Sentinel ──
+    "rampart": dict(name="Rampart", type="SKILL", cost=1,
+                    desc="Gain 6 Block. Gain 1 Dexterity.",
+                    udesc="Gain 9 Block. Gain 2 Dexterity.",
+                    fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(6, 9)),
+                                         cb.apply(cb.player, "dexterity", k.v(1, 2)))),
+    "berserk_swing": dict(name="Berserk Swing", type="ATTACK", cost=2, targeted=True,
+                          rarity="uncommon",
+                          desc="Deal 6 damage twice. Gain 2 Strength.",
+                          udesc="Deal 8 damage twice. Gain 3 Strength.",
+                          fx=lambda cb, k, t: (cb.player_attack(t, k.v(6, 8), times=2),
+                                               cb.apply(cb.player, "strength", k.v(2, 3)))),
+
+    # ── Ashwalker ──
+    "quick_step": dict(name="Quick Step", type="SKILL", cost=1,
+                       desc="Gain 4 Block. Draw 1 card. Apply 2 Poison.",
+                       udesc="Gain 6 Block. Draw 1 card. Apply 3 Poison.",
+                       targeted=True,
+                       fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(4, 6)),
+                                            cb.draw(1), cb.apply(t, "poison", k.v(2, 3)))),
+    "toxic_leap": dict(name="Toxic Leap", type="ATTACK", cost=2, targeted=True,
+                       rarity="uncommon",
+                       desc="Deal 9 damage. Apply 5 Poison. Apply 2 Weak.",
+                       udesc="Deal 12 damage. Apply 7 Poison. Apply 2 Weak.",
+                       fx=lambda cb, k, t: (cb.player_attack(t, k.v(9, 12)),
+                                            cb.apply(t, "poison", k.v(5, 7)),
+                                            cb.apply(t, "weak", 2))),
+
+    # ── Stormbound ──
+    "frost_bite": dict(name="Frost Bite", type="ATTACK", cost=1, targeted=True,
+                       desc="Deal 6 damage. Gain 1 Frost.",
+                       udesc="Deal 9 damage. Gain 2 Frost.",
+                       fx=lambda cb, k, t: (cb.player_attack(t, k.v(6, 9)),
+                                            cb.channel("frostward", k.v(1, 2)))),
+    "power_surge": dict(name="Power Surge", type="SKILL", cost=1, rarity="uncommon",
+                        desc="Channel 2 Coil. Draw 1 card.",
+                        udesc="Channel 3 Coil. Draw 2 cards.",
+                        fx=lambda cb, k, t: (cb.channel("stormcoil", k.v(2, 3)),
+                                             cb.draw(k.v(1, 2)))),
+
+    # ── Penitent ──
+    "mind_over_body": dict(name="Mind Over Body", type="SKILL", cost=1,
+                           desc="Gain 5 Block. Gain 1 Mantra. Gain 3 Vigour.",
+                           udesc="Gain 7 Block. Gain 2 Mantra. Gain 4 Vigour.",
+                           fx=lambda cb, k, t: (cb.gain_block(cb.player, k.v(5, 7)),
+                                                cb.gain_mantra(k.v(1, 2)),
+                                                cb.apply(cb.player, "vigour", k.v(3, 4)))),
+    "calm_strike": dict(name="Calm Strike", type="ATTACK", cost=1, targeted=True,
+                        rarity="uncommon",
+                        desc="Deal 7 damage. Enter Calm. Gain 4 Block.",
+                        udesc="Deal 10 damage. Enter Calm. Gain 6 Block.",
+                        fx=lambda cb, k, t: (cb.player_attack(t, k.v(7, 10)),
+                                             cb.enter_stance("calm"),
+                                             cb.gain_block(cb.player, k.v(4, 6)))),
+
+    # ── Gravewright ──
+    "bone_toss": dict(name="Bone Toss", type="ATTACK", cost=1, targeted=True,
+                      desc="Deal 8 damage. Exhaust the top card of your draw pile.",
+                      udesc="Deal 11 damage. Exhaust the top card of your draw pile.",
+                      fx=lambda cb, k, t: (cb.player_attack(t, k.v(8, 11)), cb.mill(1))),
+    "soul_siphon": dict(name="Soul Siphon", type="SKILL", cost=1, rarity="uncommon",
+                        desc="Exhaust the top 2 cards of your draw pile. "
+                             "Gain 5 Block and 1 Strength.",
+                        udesc="Exhaust the top 2 cards of your draw pile. "
+                              "Gain 7 Block and 2 Strength.",
+                        fx=lambda cb, k, t: (cb.mill(2),
+                                             cb.gain_block(cb.player, k.v(5, 7)),
+                                             cb.apply(cb.player, "strength", k.v(1, 2)))),
+
+    # ── Emberbrewer ──
+    "warm_up": dict(name="Warm Up", type="SKILL", cost=0,
+                    desc="Brew a random potion. Draw 1 card.",
+                    udesc="Brew a random potion. Draw 2 cards.",
+                    fx=lambda cb, k, t: (cb.brew(quiet_when_full=True), cb.draw(k.v(1, 2)))),
+    "reagent_toss": dict(name="Reagent Toss", type="ATTACK", cost=1, rarity="uncommon",
+                         desc="Deal 6 damage to ALL enemies. Brew a random potion.",
+                         udesc="Deal 9 damage to ALL enemies. Brew a random potion.",
+                         fx=lambda cb, k, t: ([cb.player_attack(e, k.v(6, 9))
+                                               for e in cb.living()],
+                                              cb.brew(quiet_when_full=True))),
+
+    # ── Hexbinder ──
+    "curse_word": dict(name="Curse Word", type="SKILL", cost=1,
+                       desc="Apply 2 Weak and 1 Vulnerable. Draw 1 card.",
+                       udesc="Apply 3 Weak and 2 Vulnerable. Draw 1 card.",
+                       targeted=True,
+                       fx=lambda cb, k, t: (cb.apply(t, "weak", k.v(2, 3)),
+                                            cb.apply(t, "vulnerable", k.v(1, 2)), cb.draw(1))),
+    "hex_lance": dict(name="Hex Lance", type="ATTACK", cost=2, targeted=True,
+                      rarity="uncommon",
+                      desc="Deal 5 damage plus 2 for each debuff stack on the target. "
+                           "Apply 2 Frail.",
+                      udesc="Deal 7 damage plus 3 for each debuff stack on the target. "
+                            "Apply 3 Frail.",
+                      fx=lambda cb, k, t: (cb.player_attack(
+                          t, k.v(5, 7) + k.v(2, 3) * cb.debuff_stacks(t)),
+                          cb.apply(t, "frail", k.v(2, 3)))),
 }
+
+
+
