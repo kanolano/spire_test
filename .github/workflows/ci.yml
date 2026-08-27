@@ -1,0 +1,64 @@
+# The engine is pure stdlib, so the Python job needs no install step and runs
+# on every version the package claims to support. The client job exists mostly
+# for the last step: `static/` is build output that is committed on purpose, so
+# nothing but a rebuild can tell you whether it still matches its source.
+name: CI
+
+on:
+  push:
+    branches: [master, experimental]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  engine:
+    name: engine · python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run the suite
+        run: python -m unittest discover -s tests -v
+
+  client:
+    name: client · typecheck and bundle freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install
+        working-directory: client
+        run: npm ci
+      - name: Typecheck
+        working-directory: client
+        run: npm run check
+
+      # `npm run build` writes straight into spire_of_ash/web/static. If the
+      # tree is dirty afterwards, the committed bundle was built from different
+      # source than the commit ships — which is how this repo once shipped a UI
+      # missing twelve enemy sprites and had to say so in the README.
+      - name: Rebuild the client
+        working-directory: client
+        run: npm run build
+      - name: Bundle must match its source
+        run: |
+          if [ -n "$(git status --porcelain -- spire_of_ash/web/static)" ]; then
+            echo "::error::The committed bundle is stale. Run 'cd client && npm run build' and commit spire_of_ash/web/static."
+            echo
+            echo "Working tree after a clean rebuild:"
+            git status --porcelain -- spire_of_ash/web/static
+            echo
+            git diff -- spire_of_ash/web/static/index.html
+            exit 1
+          fi
+          echo "Bundle is current with client/src."

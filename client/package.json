@@ -10,6 +10,9 @@
     "check": "tsc --noEmit",
     "preview": "vite preview"
   },
+  "engines": {
+    "node": ">=20.19"
+  },
   "devDependencies": {
     "@types/node": "^26.2.0",
     "esbuild": "^0.25.0",
