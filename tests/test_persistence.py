@@ -14,6 +14,17 @@ from spire_of_ash.engine.run import Run
 from spire_of_ash.rng import Rng
 
 
+def saved_state(run):
+    """The part of state() a save is supposed to reproduce.
+
+    `fx` is the effect stream for the action that just ran — deliberately
+    transient, and deliberately not written to the save file. A restored run
+    has not run an action, so its stream is empty; that is the design, not a
+    round-trip failure.
+    """
+    return {k: v for k, v in run.state().items() if k != "fx"}
+
+
 class TestRoundTrip(unittest.TestCase):
     def test_card(self):
         card = Card("strike", upgraded=True)
@@ -40,14 +51,14 @@ class TestRoundTrip(unittest.TestCase):
     def test_run_on_the_map(self):
         run = Run("sentinel", seed=17)
         clone = Run.from_dict(json.loads(json.dumps(run.to_dict())))
-        self.assertEqual(clone.state(), run.state())
+        self.assertEqual(saved_state(clone), saved_state(run))
 
     def test_run_mid_combat(self):
         run = Run("ashwalker", seed=99)
         run.apply({"type": "map", "idx": run.reachable()[0]})
         self.assertEqual(run.screen, "combat")
         clone = Run.from_dict(json.loads(json.dumps(run.to_dict())))
-        self.assertEqual(clone.state(), run.state())
+        self.assertEqual(saved_state(clone), saved_state(run))
 
     def test_resumed_run_stays_in_lockstep(self):
         """The property that makes resume trustworthy."""
@@ -59,7 +70,7 @@ class TestRoundTrip(unittest.TestCase):
                 run.apply({"type": "end_turn"})
             if clone.screen == "combat":
                 clone.apply({"type": "end_turn"})
-        self.assertEqual(clone.state(), run.state())
+        self.assertEqual(saved_state(clone), saved_state(run))
 
     def test_every_screen_survives_a_round_trip(self):
         seen = set()
@@ -70,7 +81,7 @@ class TestRoundTrip(unittest.TestCase):
                     break
                 seen.add(run.screen)
                 clone = Run.from_dict(json.loads(json.dumps(run.to_dict())))
-                self.assertEqual(clone.state(), run.state(),
+                self.assertEqual(saved_state(clone), saved_state(run),
                                  f"round trip broke on screen {run.screen}")
                 autoplay(run, seed=seed, max_steps=1, keep_alive=True)
         for screen in ("map", "combat", "reward"):

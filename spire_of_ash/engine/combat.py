@@ -15,9 +15,14 @@ from .errors import Defeat, InvalidAction
 
 
 class Combat:
-    def __init__(self, player, enemies, rng, label="", kind="monster"):
+    def __init__(self, player, enemies, rng, label="", kind="monster", fx=None):
         self.player = player
         self.enemies = enemies
+        # Ordered record of what happened, for a client that wants to play the
+        # turn out rather than cut to the result. The Run owns the list and
+        # clears it per action — see Run.apply — because a killing blow has to
+        # outlive `self.combat = None`.
+        self.fx = [] if fx is None else fx
         for e in enemies:
             e.allies = enemies
         self.rng = rng
@@ -59,9 +64,34 @@ class Combat:
 
         The old engine baked ANSI colour codes in here, so the web layer had to
         strip them back out with a regex. Styling is the client's job.
+
+        Every line is also an fx event, which is what lets a client scroll the
+        log in step with the action instead of dumping it all at the end.
         """
         self.log.append(text)
         self.log = self.log[-B.COMBAT_LOG_LEN:]
+        self.emit("log", text=text)
+
+    # ── the effect stream ──
+    def emit(self, k, **data):
+        """Record one thing that happened, in the order it happened.
+
+        This is data, not presentation: it says an enemy took 7 damage through
+        3 block, not that anything should flash red. What a client does with
+        it — stage it over a second, or ignore it entirely, as the terminal
+        does — is the client's business.
+        """
+        self.fx.append(dict(k=k, **data))
+
+    def who(self, combatant):
+        """Identify a combatant the way the view model does: "player", or an
+        index into `enemies`."""
+        if combatant is self.player:
+            return "player"
+        for i, e in enumerate(self.enemies):
+            if e is combatant:
+                return i
+        return None
 
     def lock_draw(self):
         self.no_draw = True
@@ -74,6 +104,7 @@ class Combat:
         for _ in range(times):
             if not target or not target.alive:
                 return
+            self.emit("swing", src="player", dst=self.who(target))
             if potion:
                 dmg = base
                 if target.s("vulnerable"):
@@ -99,6 +130,7 @@ class Combat:
 
     def enemy_attack(self, enemy, base):
         dmg = damage_after_modifiers(enemy, base, self.player)
+        self.emit("swing", src=self.who(enemy), dst="player")
         self.damage(self.player, dmg)
         if self.player.s("thorns") and enemy.alive:
             self.damage(enemy, self.player.s("thorns"), ignore_block=True)
@@ -107,13 +139,19 @@ class Combat:
         """Apply damage through Block. Returns HP actually lost."""
         if dmg <= 0:
             return 0
+        absorbed = 0
         if not ignore_block:
             absorbed = min(target.block, dmg)
             target.block -= absorbed
             dmg -= absorbed
+        if dmg > 0:
+            target.hp -= dmg
+        # Emitted before die(), which raises: the blow that kills you is the
+        # one most worth showing.
+        self.emit("damage", who=self.who(target), amount=dmg, blocked=absorbed,
+                  hp=max(0, target.hp), block=target.block)
         if dmg <= 0:
             return 0
-        target.hp -= dmg
         if target is self.player and target.hp <= 0:
             self.die()
         if target is not self.player and target.hp <= 0:
@@ -132,6 +170,8 @@ class Combat:
 
     def lose_hp(self, target, n, from_card=False):
         target.hp -= n
+        self.emit("lose_hp", who=self.who(target), amount=n,
+                  hp=max(0, target.hp))
         if from_card and target is self.player and self.player.s("rupture"):
             self.apply(self.player, "strength", self.player.s("rupture"))
         if target is self.player and target.hp <= 0:
@@ -143,6 +183,7 @@ class Combat:
         enemy.hp = 0
         enemy.alive = False
         self.kills += 1
+        self.emit("death", who=self.who(enemy))
         self.msg(f"{enemy.name} is slain!")
         for hook in self._relics("on_kill"):
             hook(self, enemy)
@@ -151,7 +192,11 @@ class Combat:
             od(self, enemy)
 
     def heal(self, target, n):
+        before = target.hp
         target.hp = min(target.max_hp, target.hp + n)
+        if target.hp != before:
+            self.emit("heal", who=self.who(target), amount=target.hp - before,
+                      hp=target.hp)
 
     # ── block & statuses ──
     def gain_block(self, who, amount):
@@ -165,6 +210,8 @@ class Combat:
         who.block += amount
         if who is self.player and who.s("lightningrod"):
             self.channel("stormcoil", who.s("lightningrod"))
+        if amount:
+            self.emit("block", who=self.who(who), amount=amount, total=who.block)
         if who is self.player and who.s("juggernaut"):
             targets = self.living()
             if targets:
@@ -175,6 +222,8 @@ class Combat:
         if n == 0 or target is None or not target.alive:
             return
         target.st[key] += n
+        self.emit("status", who=self.who(target), key=key, n=n,
+                  total=target.st[key])
         weakened = key in DEBUFFS if n > 0 else key == "strength"
         if weakened and target is not self.player and self.player.s("hexbloom"):
             self.damage(target, self.player.s("hexbloom"))
@@ -193,7 +242,10 @@ class Combat:
                 self.draw_pile = self.discard
                 self.discard = []
                 self.rng.shuffle(self.draw_pile)
-            self.hand.append(self.draw_pile.pop())
+                self.emit("shuffle", n=len(self.draw_pile))
+            card = self.draw_pile.pop()
+            self.hand.append(card)
+            self.emit("draw", key=card.key)
 
     def add_card_to_pile(self, card, to_draw=False):
         if self.player.s("masterreality"):
@@ -222,6 +274,7 @@ class Combat:
         p = self.player
         self.exhausted.append(card)
         self.exhausts_this_combat += 1
+        self.emit("exhaust", key=card.key)
         if p.s("feelnopain"):
             self.gain_block(p, p.s("feelnopain"))
         if p.s("soulfire"):
@@ -259,6 +312,7 @@ class Combat:
                 return
             card = self.hand.pop(self.rng.randrange(len(self.hand)))
             self.discard.append(card)
+            self.emit("discard", key=card.key)
             self.msg(f"Discarded {card.name}.")
 
     def multiply_poison(self, target, mult):
@@ -598,6 +652,7 @@ class Combat:
             e.roll_intent()
 
     def player_turn_start(self):
+        self.emit("turn", phase="player_start")
         p = self.player
         if not p.s("barricade"):
             p.block = 0
@@ -641,6 +696,7 @@ class Combat:
         self.draw(B.BASE_DRAW + extra)
 
     def player_turn_end(self):
+        self.emit("turn", phase="player_end")
         p = self.player
         if p.s("metallicize"):
             self.gain_block(p, p.s("metallicize"))
@@ -670,6 +726,7 @@ class Combat:
             self.enter_stance(None)
 
     def enemy_turns(self):
+        self.emit("turn", phase="enemy_start")
         # living() is a snapshot: an enemy can die partway through this loop —
         # to Thorns, to another enemy's move, to its own poison tick — and must
         # not go on acting. It used to finish every hit of a multi-hit attack
@@ -677,33 +734,46 @@ class Combat:
         for e in self.living():
             if not e.alive:
                 continue
-            if e.s("poison"):
-                self.lose_hp(e, e.s("poison"))
-                e.st["poison"] -= 1
-                if not e.alive:
-                    continue
-            e.block = 0
-            if e.s("ritual"):
-                self.apply(e, "strength", e.s("ritual"))
-            m = e.moves[e.intent]
-            if m["kind"] == "attack":
-                for _ in range(m["hits"]):
-                    if not e.alive:
-                        break
-                    self.enemy_attack(e, m["dmg"])
-            if m["fn"] and e.alive:
-                m["fn"](self, e)
+            # Brackets one enemy's whole turn, so a client can give each of
+            # them its own beat rather than resolving five at once. The finally
+            # matters: the enemy may die inside, and the player may die inside,
+            # which leaves by raising Defeat.
+            self.emit("act", who=self.who(e), move=e.intent)
+            try:
+                self._enemy_turn(e)
+            finally:
+                self.emit("act_end", who=self.who(e))
+
+    def _enemy_turn(self, e):
+        if e.s("poison"):
+            self.lose_hp(e, e.s("poison"))
+            e.st["poison"] -= 1
             if not e.alive:
-                continue
-            self.msg(f"{e.name} uses {e.intent}.")
-            e.history.append(e.intent)
-            e.turn += 1
-            if not e.s("entrenched"):
-                for key in DECAYING:
-                    if e.st[key] > 0:
-                        e.st[key] -= 1
-            if e.alive:
-                e.roll_intent()
+                return
+        e.block = 0
+        if e.s("ritual"):
+            self.apply(e, "strength", e.s("ritual"))
+        m = e.moves[e.intent]
+        if m["kind"] == "attack":
+            for _ in range(m["hits"]):
+                if not e.alive:
+                    break
+                self.enemy_attack(e, m["dmg"])
+        if m["fn"] and e.alive:
+            m["fn"](self, e)
+        if not e.alive:
+            return
+        self.msg(f"{e.name} uses {e.intent}.")
+        e.history.append(e.intent)
+        e.turn += 1
+        # `entrenched` (Hexbinder's Long Grudge) freezes an enemy's debuffs so
+        # they do not tick down at the end of its turn.
+        if not e.s("entrenched"):
+            for key in DECAYING:
+                if e.st[key] > 0:
+                    e.st[key] -= 1
+        if e.alive:
+            e.roll_intent()
 
     def end_combat(self):
         """Fire post-combat relics. Called once, after the last enemy dies."""
@@ -744,6 +814,10 @@ class Combat:
 
         self.energy -= cost
         self.hand.pop(idx)
+        # Emitted before the effect runs, so a client can fly the card at its
+        # target and land the damage on arrival rather than before it.
+        self.emit("play", idx=idx, key=card.key, cost=cost,
+                  target=self.who(target) if target else None)
         # The played card leaves hand before its effect runs, so a choice the
         # player made against the pre-play hand has to shift down by one.
         if exhaust is not None and isinstance(exhaust, int) and exhaust > idx:
@@ -763,6 +837,7 @@ class Combat:
             self.exhaust_card(card)
         elif card.type != "POWER":       # powers leave play entirely
             self.discard.append(card)
+            self.emit("discard", key=card.key)
 
     def use_potion(self, idx, target_idx=None):
         p = self.player
@@ -834,4 +909,7 @@ class Combat:
         cb.discard = [Card.from_dict(k) for k in d["discard"]]
         cb.exhausted = [Card.from_dict(k) for k in d["exhausted"]]
         cb.pending_exhaust = None
+        # Transient: an effect stream describes one action, so a restored
+        # combat starts with nothing to replay. Run.apply rebinds this.
+        cb.fx = []
         return cb

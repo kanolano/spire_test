@@ -8,6 +8,11 @@ __pycache__/
 spire_save.json
 runs/
 
+# client build toolchain. The *output* in spire_of_ash/web/static is committed
+# on purpose, so playing the game still needs nothing but Python.
+client/node_modules/
+.playwright-mcp/
+
 # editor / tooling
 .claude/
 .mcp.json

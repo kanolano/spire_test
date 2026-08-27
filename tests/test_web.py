@@ -3,6 +3,7 @@
 import http.client
 import json
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -272,12 +273,22 @@ class TestUi(WebTestCase):
 
 
 class TestStatic(WebTestCase):
-    def test_stylesheet_and_script_are_served(self):
-        for path, ctype in (("/static/app.css", "text/css"),
-                            ("/static/app.js", "text/javascript")):
+    def test_every_asset_the_shell_references_is_served(self):
+        """The client is a hashed bundle, so the filenames change on every
+        build. Asking index.html what it needs keeps this honest without
+        pinning names the build owns."""
+        status, body, _ = self.client().request("/")
+        self.assertEqual(status, 200)
+        refs = re.findall(r'(?:src|href)="(/static/[^"]+)"', body.decode())
+        self.assertTrue(refs, "index.html references no assets")
+
+        expected = {".css": "text/css", ".js": "text/javascript"}
+        for path in refs:
             status, _, headers = self.client().request(path)
             self.assertEqual(status, 200, path)
-            self.assertIn(ctype, headers.get("Content-Type"))
+            ctype = expected.get(os.path.splitext(path)[1])
+            if ctype:
+                self.assertIn(ctype, headers.get("Content-Type"), path)
 
     def test_path_traversal_is_refused(self):
         status, _, _ = self.client().request("/static/../app.py")

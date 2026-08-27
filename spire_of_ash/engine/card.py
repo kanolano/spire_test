@@ -4,7 +4,15 @@ A card is fully described by its key plus whether it has been upgraded, which is
 what makes saving a deck cheap.
 """
 
+import itertools
+
 from ..content.cards import CARDS
+
+# Per-instance ids, so a client can follow one card from hand to target to
+# discard and animate it. Deliberately not persisted: they only have to be
+# unique within a page's lifetime, and baking them into saves would grow the
+# file for nothing.
+_ids = itertools.count(1)
 
 
 class Card:
@@ -12,6 +20,7 @@ class Card:
 
     def __init__(self, key, upgraded=False):
         d = CARDS[key]
+        self.uid = next(_ids)
         self.key = key
         self.base_name = d["name"]
         self.type = d["type"]
