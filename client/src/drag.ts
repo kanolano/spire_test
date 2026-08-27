@@ -36,6 +36,14 @@ export function wireDrag() {
   document.addEventListener("pointermove", onMove);
   document.addEventListener("pointerup", onUp);
   document.addEventListener("pointercancel", cancel);
+  // While a card-drag is pending or live, stop the browser selecting the
+  // card's name and rules text under the pointer. Scoped to `drag`, so it
+  // never interferes with selecting text anywhere else, and — unlike
+  // preventDefault on pointerdown — it cannot suppress the click that plays a
+  // card when the pointer barely moves.
+  document.addEventListener("selectstart", (ev) => {
+    if (drag) ev.preventDefault();
+  });
 }
 
 function onDown(ev: PointerEvent) {

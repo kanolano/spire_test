@@ -226,7 +226,7 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.02em}
 .foe.droptarget .foe-pose{transform:translateY(-4px) scale(1.06)}
 
 /* ── drag to play ────────────────────────────────────────── */
-body.dragging{cursor:grabbing}
+body.dragging{cursor:grabbing;user-select:none;-webkit-user-select:none}
 body.dragging #hand .slot:hover{transform:none !important}
 #hand .slot.held{z-index:80 !important;transition:none}
 #hand .slot.held .card{box-shadow:0 18px 34px rgba(0,0,0,.6);cursor:grabbing;
