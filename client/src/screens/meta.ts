@@ -74,15 +74,20 @@ export function renderEnd(st: HTMLElement, won: boolean) {
   st.appendChild(again);
   st.appendChild(ctaButton("Choose another class <kbd>C</kbd>", () => void abandon()));
 
+  // #stage is one long-lived element that every render wipes and refills, so
+  // appending on arrival of the fetch would drop "Best runs" onto whichever
+  // screen is showing by then — climb again before /records answers and the
+  // leaderboard lands on the map. Claiming the slot synchronously means a
+  // rebuild detaches it first, and the late write goes nowhere.
+  const board = el("div", "center ghost");
+  st.appendChild(board);
   void getRecords().then((recs) => {
     if (!recs || !recs.length) return;
-    const d = el("div", "center ghost");
-    d.style.marginTop = "26px";
-    d.innerHTML = "<b>Best runs</b><br>" + recs.slice(0, 5).map((r) =>
+    board.style.marginTop = "26px";
+    board.innerHTML = "<b>Best runs</b><br>" + recs.slice(0, 5).map((r) =>
       `act ${r.act} · floor ${r.floors} · `
       + (r.won ? "<span style='color:var(--leaf)'>ascended</span>"
                : "died to " + esc(r.killer))).join("<br>");
-    st.appendChild(d);
   }).catch(() => { /* the leaderboard is decoration; its absence is not an error */ });
 }
 

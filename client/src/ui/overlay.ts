@@ -15,7 +15,17 @@ let overlayConfirm: (() => void) | null = null; // set while asking a yes/no
 export const overlayOpen = () => $("#overlay").classList.contains("on");
 export const pendingConfirm = () => overlayConfirm;
 
+/**
+ * Bumped every time the modal's contents are replaced or it is dismissed.
+ * `showPile` fetches, so by the time it can write, the player may have closed
+ * the modal or asked it a different question; comparing generations is how a
+ * late answer knows it is answering nobody.
+ */
+let overlayGen = 0;
+export const overlayGeneration = () => overlayGen;
+
 export function showOverlay() {
+  overlayGen++;
   hideTip();
   overlayReturn = overlayOpen()
     ? overlayReturn
@@ -25,6 +35,7 @@ export function showOverlay() {
 }
 
 export function closeOverlay() {
+  overlayGen++;
   $("#overlay").classList.remove("on");
   overlayReturn?.focus?.();
   overlayReturn = null;
@@ -81,12 +92,15 @@ const PILE_TITLES: Record<string, string> = {
 export async function showPile(k: string) {
   const title = PILE_TITLES[k] ?? "Pile";
   openOverlay(title, [], "Loading…");
+  const mine = overlayGeneration();
   try {
     const piles = await getPiles();
+    if (overlayGeneration() !== mine) return;   // closed, or showing something else
     const pile = (piles as unknown as Record<string, CardView[]>)[k] ?? [];
     openOverlay(`${title} — ${pile.length} cards`, pile,
       k === "draw_pile" ? "Sorted; the real draw order is hidden." : "");
   } catch (e) {
+    if (overlayGeneration() !== mine) return;
     toast(e instanceof ApiError ? e.message : "Could not reach the Spire.");
     closeOverlay();
   }
