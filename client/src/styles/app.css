@@ -714,8 +714,13 @@ body{animation:ambient 22s ease-in-out infinite alternate}
 .node .beacon{transform-origin:center;animation:beacon 2.4s ease-out infinite}
 @keyframes beacon{0%{opacity:.55;transform:scale(1)}70%{opacity:0;transform:scale(1.9)}
   100%{opacity:0;transform:scale(1.9)}}
-/* reachable node lifts and brightens on hover */
-.node.can .disc{transition:fill .14s,transform .14s}
+/* reachable node lifts and brightens on hover.
+   transform-box/transform-origin do not inherit, so the disc cannot borrow
+   the ones .node sets: without its own it scales about the SVG's origin and
+   slides ~100px out from under the pointer, which drops :hover, springs back,
+   and re-enters — the flicker loop. fill-box keeps the growth in place. */
+.node.can .disc{transition:fill .14s,transform .14s;
+  transform-box:fill-box;transform-origin:50% 50%}
 .node.can:hover .disc{transform:scale(1.12)}
 .node.can:hover{filter:brightness(1.15)}
 /* boss node breathes so the top of the act reads as the destination */
@@ -731,7 +736,8 @@ line.edge-open{stroke-dasharray:8 5;animation:crawl 1.1s linear infinite}
 
 /* ══ reward polish ══════════════════════════════════════════════════════════ */
 /* rows and cards enter staggered from below */
-.rewards .reward-row,.combatlog{animation:riserow .34s ease backwards}
+#stage.arrive .rewards .reward-row,
+#stage.arrive .combatlog{animation:riserow .34s ease backwards}
 .rewards .reward-row:nth-child(1){animation-delay:.04s}
 .rewards .reward-row:nth-child(2){animation-delay:.11s}
 .rewards .reward-row:nth-child(3){animation-delay:.18s}
@@ -747,7 +753,8 @@ line.edge-open{stroke-dasharray:8 5;animation:crawl 1.1s linear infinite}
   100%{background:var(--panel)}}
 
 /* ══ shop polish ════════════════════════════════════════════════════════════ */
-#stage.screen-shop .card,#stage.screen-shop .item{animation:riserow .3s ease backwards}
+#stage.screen-shop.arrive .card,
+#stage.screen-shop.arrive .item{animation:riserow .3s ease backwards}
 #stage.screen-shop .card:nth-child(2){animation-delay:.05s}
 #stage.screen-shop .card:nth-child(3){animation-delay:.1s}
 #stage.screen-shop .card:nth-child(4){animation-delay:.15s}
@@ -761,7 +768,7 @@ line.edge-open{stroke-dasharray:8 5;animation:crawl 1.1s linear infinite}
 
 /* ══ campfire / event / treasure ════════════════════════════════════════════ */
 /* choices slide in one after another; hover pushes the row rightward */
-.choices .choice{animation:slidein .3s ease backwards}
+:is(#stage.arrive,#overlay) .choices .choice{animation:slidein .3s ease backwards}
 .choices .choice:nth-child(1){animation-delay:.03s}
 .choices .choice:nth-child(2){animation-delay:.09s}
 .choices .choice:nth-child(3){animation-delay:.15s}

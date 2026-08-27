@@ -47,6 +47,10 @@ export const LETTERS = "abcdefgh";
 export function staggerIn(
   nodes: Iterable<Element>, step = 0.05, base = 0.03,
 ): void {
+  // Arrivals only. Every non-combat screen is rebuilt from scratch on any
+  // state change, so without this an update re-deals contents that were
+  // already on screen and unchanged.
+  if (!document.querySelector("#stage.arrive")) return;
   [...nodes].forEach((n, i) => {
     n.classList.add("risein");
     (n as HTMLElement).style.animationDelay = `${(base + i * step).toFixed(3)}s`;

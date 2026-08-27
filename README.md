@@ -98,15 +98,6 @@ Run `python3 -m spire_of_ash.web` alongside `npm run dev` — the dev server
 proxies `/state`, `/action` and friends to it. **Commit the rebuilt `static/`
 along with your source change**, or players get the previous UI.
 
-> **This branch ships a stale bundle.** The client source here has changes the
-> committed `static/` build does not: sprites for the twelve added enemies and
-> five starter relics, hero sprites for the five newer climbers, and a fix for
-> text highlighting while dragging a card. Until someone runs
-> `cd client && npm install && npm run build` and commits the result, the new
-> creatures render as the fallback glyph and the drag fix is absent. The
-> art-manifest and the Python suite already reflect the *source*, so the suite
-> passes either way.
-
 The build also emits `static/art-manifest.json`, listing every sprite the
 client can draw. `tests/test_content.py` checks it against the content tables,
 so a monster added without art fails the suite rather than quietly rendering as

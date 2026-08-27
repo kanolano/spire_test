@@ -118,7 +118,13 @@ export function render() {
   st.className = "screen-" + state.screen;
   // Every screen change used to be the same 0.22s fade, so leaving a shop and
   // walking into a fight felt identical. Direction of travel now shows.
-  if (changed) { void st.offsetWidth; st.classList.add(transition(lastScreen, state.screen)); }
+  // `arrive` additionally gates the per-element entry animations. A screen
+  // rebuilt in place — taking one of three rewards — is not an arrival, and
+  // re-dealing rows that never left reads as the whole page flickering.
+  if (changed) {
+    void st.offsetWidth;
+    st.classList.add(transition(lastScreen, state.screen), "arrive");
+  }
   setLastScreen(state.screen);
 
   if (state.banner) {
