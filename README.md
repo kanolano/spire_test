@@ -67,11 +67,15 @@ so a content change that quietly guts a climber can fail CI rather than ship.
 Numbers move when the game or the policy changes, so treat any figure here as a
 timestamp rather than a fact. What the first 2,100-run report found:
 
-- **The act-1 boss is where runs end.** 57% of runs finish in act 1, and the
-  two act-1 bosses account for 37% of all deaths.
-- **The two act-1 bosses are not interchangeable.** The draw is a clean 50/50,
-  but The Guardian kills 554 runs to the Slime Boss's 231 — so which boss the
-  seed hands you matters more than anything you do about it.
+- **The act-1 boss is where runs end.** 80% of runs reach it and 57% finish in
+  act 1, so the climb up is not what stops people — the boss is.
+- **The two act-1 bosses were not interchangeable.** The draw is a clean 50/50
+  and players arrive at both on the same health (49.3 HP vs 50.2), but The
+  Guardian killed 66.7% of them against the Slime Boss's 27.1%. The cause was
+  not fight length — both run about seven turns — but damage: 49.5 over the
+  fight against 40.5, either side of the ~50 HP players arrive with. A 22%
+  difference in damage sat on the kill line and read as 2.5x the deaths.
+  Retuned to 40.0%; see the note above `guardian` in `content/monsters.py`.
 - **More cards is better here**, which is the opposite of the genre's usual
   advice. Capping the deck at 22 cards cost the Emberbrewer two thirds of its
   win rate, so card rewards are not the trap they are in the games this one is

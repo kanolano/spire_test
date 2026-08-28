@@ -285,11 +285,25 @@ MONSTERS = {
     # unblocked Fierce Bash was 43% of a Sentinel's max HP. The big hits came
     # down and some of the HP went back, so the fight is still long enough to
     # need a plan without being decided by a single unlucky turn.
-    "guardian": dict(name="The Guardian", hp=(200, 200), boss=True, moves={
+    #
+    # That trade was right in direction and overshot in size. `spire_of_ash.sim`
+    # put the two act-1 bosses side by side over 1681 fights: the draw between
+    # them is a clean 50/50, players reach them at the same health (49.3 HP vs
+    # 50.2), and the Guardian killed 66.7% of them against the Slime Boss's
+    # 27.1%. The cause was not the length — both fights run about seven turns,
+    # because the Slime Boss blocks far more often and their effective HP is
+    # nearly equal. It was that the Guardian dealt 49.5 damage over the fight
+    # against 40.5, and players arrive with about 50 HP. A 22% difference in
+    # damage sat straight on the kill line, so it read as 2.5x the deaths.
+    #
+    # HP 200 -> 160 and Vent Steam no longer stacking Weak on top of Vulnerable
+    # move it to 40.0%, measured over 2100 runs. The remaining ~13-point gap to
+    # the Slime Boss is deliberate: this is still meant to be the harder of the
+    # two. Going below 160 buys almost nothing — 155 is worth 1.8 points.
+    "guardian": dict(name="The Guardian", hp=(160, 160), boss=True, moves={
         "Charging Up": mv("block", fn=_block(9)),
         "Fierce Bash": mv("attack", 22),
-        "Vent Steam": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "vulnerable", 2),
-                                                     cb.apply(cb.player, "weak", 2))),
+        "Vent Steam": mv("debuff", fn=lambda cb, e: cb.apply(cb.player, "vulnerable", 2)),
         "Whirlwind": mv("attack", 5, hits=4),
         "Twin Slam": mv("attack", 8, hits=2, fn=_grow(2)),
     }, pick=cycle_pick(["Charging Up", "Fierce Bash", "Vent Steam", "Whirlwind", "Twin Slam"])),

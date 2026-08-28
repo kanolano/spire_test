@@ -476,3 +476,48 @@ class TestMonsterSmoke(unittest.TestCase):
                 groups = [tuple(g) for g in pools[kind]]
                 self.assertEqual(len(groups), len(set(groups)),
                                  f"act {act} {kind} has a duplicate group")
+
+
+class TestActOneBossParity(unittest.TestCase):
+    """The two act-1 bosses are drawn 50/50, so they have to be comparable.
+
+    These pin the numbers a simulation run of 2100 climbs settled on, because
+    the failure they guard against is silent: nothing crashes when a boss is
+    twice as lethal as the one it shares a coin flip with, and by the time it
+    is noticed the reason has been forgotten. `python3 -m spire_of_ash.sim`
+    re-measures if these need to move — do not simply edit them to pass.
+    """
+
+    def _damage_per_cycle(self, key):
+        """Total damage one full move rotation deals, ignoring the player."""
+        m = MONSTERS[key]
+        return sum(mvv["dmg"] * mvv["hits"]
+                   for mvv in m["moves"].values() if mvv["kind"] == "attack")
+
+    def test_the_guardian_stays_within_reach_of_its_sibling(self):
+        g, s = MONSTERS["guardian"], MONSTERS["slime_boss"]
+        # At 200 HP the Guardian killed 66.7% of the players who reached it
+        # against the Slime Boss's 27.1%, on the same entry health.
+        self.assertLessEqual(g["hp"][0], 175,
+                             "the Guardian's HP is back where it was a wall")
+        self.assertLess(g["hp"][0] / s["hp"][0], 1.2,
+                        "the act-1 bosses should not differ wildly in length")
+
+    def test_vent_steam_does_not_stack_two_debuffs(self):
+        """Vulnerable and Weak together is what put its damage over the line."""
+        cb = make_combat(("guardian",))
+        cb.start_combat()
+        foe = cb.enemies[0]
+        foe.intent = "Vent Steam"
+        cb.enemy_turns()
+        self.assertGreater(cb.player.s("vulnerable"), 0, "it still punishes you")
+        self.assertEqual(cb.player.s("weak"), 0,
+                         "Weak on top of Vulnerable is the stack that overshot")
+
+    def test_neither_act_one_boss_out_damages_the_other_by_half(self):
+        g = self._damage_per_cycle("guardian")
+        s = self._damage_per_cycle("slime_boss")
+        hi, lo = max(g, s), min(g, s)
+        self.assertLess(hi / lo, 2.5,
+                        f"act-1 boss damage per rotation is lopsided: {g} vs {s}")
+
