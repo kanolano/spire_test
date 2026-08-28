@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin } from "vite";
+import { type Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 import { build as esbuild } from "esbuild";
 import { writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -45,6 +46,14 @@ function artManifest(): Plugin {
 
 export default defineConfig(({ command }) => ({
   root: HERE,
+  // The suite runs in jsdom because everything worth testing here touches the
+  // DOM: the bugs this client has actually shipped were a screen rebuilt in
+  // place and a fetch answering after the thing that asked was gone.
+  test: {
+    environment: "jsdom",
+    include: ["src/**/*.test.ts"],
+    restoreMocks: true,
+  },
   // Python serves index.html at "/" but assets out of "/static/".
   base: command === "build" ? "/static/" : "/",
   plugins: [artManifest()],

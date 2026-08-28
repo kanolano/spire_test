@@ -201,6 +201,18 @@ Run `python3 -m spire_of_ash.web` alongside `npm run dev` — the dev server
 proxies `/state`, `/action` and friends to it. **Commit the rebuilt `static/`
 along with your source change**, or players get the previous UI.
 
+```sh
+npm test         # the client suite, in jsdom
+npm run test:watch
+```
+
+The Python suite says nothing about any of this, and cannot: both client bugs
+in this repo's history — a screen re-dealt when it was rebuilt in place, and a
+fetch answering after the thing that asked it was gone — were invisible to every
+one of those tests. So the client has its own, and the ones that matter most are
+the staleness tests: they fail if the guards are removed, which is the only
+evidence that a test is worth having.
+
 The build also emits `static/art-manifest.json`, listing every sprite the
 client can draw. `tests/test_content.py` checks it against the content tables,
 so a monster added without art fails the suite rather than quietly rendering as

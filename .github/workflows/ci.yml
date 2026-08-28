@@ -27,7 +27,7 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   client:
-    name: client · typecheck and bundle freshness
+    name: client · tests, typecheck and bundle freshness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +42,14 @@ jobs:
       - name: Typecheck
         working-directory: client
         run: npm run check
+
+      # The Python suite cannot see any of this: both client bugs fixed in
+      # this repo's history — a screen re-dealt on an in-place rebuild, and a
+      # fetch answering after the thing that asked it was gone — were invisible
+      # to all 304 of those tests.
+      - name: Test the client
+        working-directory: client
+        run: npm test
 
       # `npm run build` writes straight into spire_of_ash/web/static. If the
       # tree is dirty afterwards, the committed bundle was built from different
