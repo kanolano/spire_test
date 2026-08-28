@@ -47,6 +47,7 @@ python3 -m spire_of_ash.sim                      # 60 runs per class
 python3 -m spire_of_ash.sim --runs 500           # tighter numbers
 python3 -m spire_of_ash.sim --classes hexbinder  # one climber
 python3 -m spire_of_ash.sim --json out.json      # raw rows, for a diff
+python3 -m spire_of_ash.sim --cards              # per-card play rates
 ```
 
 It plays the real engine through the same `apply`/`state` machine both clients
@@ -76,6 +77,12 @@ timestamp rather than a fact. What the first 2,100-run report found:
   fight against 40.5, either side of the ~50 HP players arrive with. A 22%
   difference in damage sat on the kill line and read as 2.5x the deaths.
   Retuned to 40.0%; see the note above `guardian` in `content/monsters.py`.
+- **Play rate measures the player, not the card.** Across 231 cards it slides
+  95% → 59% → 32% → 22% from cost 0 to cost 3, and at equal cost attacks run
+  +14 points against skills' −12 — the first is the three-energy budget, the
+  second is the policy reading damage but guessing at skills. `--cards` divides
+  both out and compares a card only against others of the same cost and type.
+  Even then, treat it as a hint.
 - **More cards is better here**, which is the opposite of the genre's usual
   advice. Capping the deck at 22 cards cost the Emberbrewer two thirds of its
   win rate, so card rewards are not the trap they are in the games this one is

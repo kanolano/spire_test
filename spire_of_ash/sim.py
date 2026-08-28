@@ -43,6 +43,13 @@ from .engine.run import Run
 # copy of every card's numbers that would drift from the fx lambdas.
 _DAMAGE = re.compile(r"Deal (\d+) damage")
 _BLOCK = re.compile(r"Gain (\d+) Block")
+# "Deal 4 damage three times" is 12, not 4. Reading only the first number made
+# the policy undervalue every multi-hit and AoE attack in the game — the card
+# telemetry found it: Blade Dance had the best damage per energy in the pool
+# and one of the worst play rates, which is the fingerprint of a card the
+# player cannot see the value of.
+_TIMES = re.compile(r"(\d+) times")
+_WORD_TIMES = (("three times", 3), ("thrice", 3), ("twice", 2), ("four times", 4))
 
 MAX_STEPS = 20000          # a full act-3 run is ~2-4k actions; this is a stall guard
 
@@ -55,6 +62,33 @@ def _desc(key, upgraded):
 def _stat(pattern, key, upgraded):
     m = pattern.search(_desc(key, upgraded))
     return int(m.group(1)) if m else 0
+
+
+def _attack_damage(key, upgraded, alive):
+    """(damage one enemy takes, total damage the card puts out).
+
+    The two differ for anything that hits everything: a 3-damage sweep against
+    four enemies is 12 output but still only 3 towards killing any one of them,
+    and confusing the two is how a policy talks itself into a sweep that kills
+    nobody.
+    """
+    text = _desc(key, upgraded)
+    m = _DAMAGE.search(text)
+    if not m:
+        return 0, 0
+    dmg = int(m.group(1))
+    hits = 1
+    mt = _TIMES.search(text)
+    if mt:
+        hits = int(mt.group(1))
+    else:
+        for word, n in _WORD_TIMES:
+            if word in text:
+                hits = n
+                break
+    per_target = dmg * hits
+    everyone = "ALL enemies" in text
+    return per_target, per_target * (max(alive, 1) if everyone else 1)
 
 
 class Result:
@@ -255,15 +289,17 @@ class GreedyPolicy(Policy):
             target = weakest if info.get("targeted") else None
 
             if kind == "ATTACK":
-                dmg = _stat(_DAMAGE, key, up)
+                # Lethality is judged per target; value is judged on total
+                # output, so a sweep gets credit for the whole room.
+                dmg, output = _attack_damage(key, up, len(alive))
                 lethal = [i for i in alive
                           if dmg and dmg >= cb["enemies"][i]["hp"] + cb["enemies"][i]["block"]]
                 if lethal:
                     # Kill the one that was about to hit hardest.
                     kill = max(lethal, key=lambda i: cb["enemies"][i]["intent"].get("damage", 0))
-                    out.append((1000 + dmg, idx, kill if info.get("targeted") else None))
+                    out.append((1000 + output, idx, kill if info.get("targeted") else None))
                     continue
-                score = (dmg or 6) * 10 / per
+                score = (output or 6) * 10 / per
                 out.append((score, idx, target))
             elif kind == "SKILL":
                 blk = _stat(_BLOCK, key, up)
@@ -317,8 +353,149 @@ POLICIES = {"greedy": GreedyPolicy, "random": RandomPolicy}
 
 # ── driving one run ─────────────────────────────────────────────────────────
 
-def simulate(cls, seed, policy_cls=GreedyPolicy, max_steps=MAX_STEPS):
+# ── card telemetry ──────────────────────────────────────────────────────────
+
+class Telemetry:
+    """Per-card counters, gathered by watching the game rather than changing it.
+
+    Everything here is derived from the state the engine already publishes: a
+    card's damage is the enemy HP that disappeared while it resolved, and a
+    dead card is one that sat in hand when the turn ended. Nothing reaches into
+    combat internals, so the engine stays a pure state machine and these
+    numbers cannot drift from what a client would see.
+
+    The blind spots are worth stating. Damage that lands on a corpse's overkill
+    is not counted, block and debuffs are not valued at all, and a card that
+    wins the fight by setting up the next card gets none of the credit. So this
+    finds cards that are never played or never do anything — not cards that are
+    subtly weak.
+    """
+
+    def __init__(self):
+        self.drawn = Counter()      # times the card arrived in hand
+        self.played = Counter()
+        self.held = Counter()       # still in hand when the turn ended
+        self.damage = Counter()
+        self.energy = Counter()
+
+    def drew(self, key, n=1):
+        self.drawn[key] += n
+
+    def saw_hand_at_turn_end(self, hand):
+        for c in hand:
+            self.held[c["key"]] += 1
+
+    def saw_play(self, key, cost, damage):
+        self.played[key] += 1
+        self.energy[key] += cost
+        self.damage[key] += max(damage, 0)
+
+    def rows(self, min_draws=1):
+        out = []
+        for key in sorted(self.drawn):
+            drawn = self.drawn[key]
+            if drawn < min_draws:
+                continue
+            played = self.played[key]
+            info = CARDS.get(key) or {}
+            spent = self.energy[key]
+            out.append({
+                "key": key,
+                "name": info.get("name", key),
+                "type": info.get("type", "?"),
+                "cost": info.get("cost"),
+                "drawn": drawn,
+                "played": played,
+                "play_rate": played / drawn if drawn else 0.0,
+                "dead_rate": self.held[key] / drawn if drawn else 0.0,
+                "damage": self.damage[key],
+                "dmg_per_play": self.damage[key] / played if played else 0.0,
+                # Undefined rather than zero for a free card: dividing its
+                # damage by no energy at all once ranked Cinder Dart and Spill
+                # last in a table they belong at the top of.
+                "dmg_per_energy": (self.damage[key] / spent) if spent else None,
+            })
+        return out
+
+
+class _Watched:
+    """A Run with a tap on it, so the simulator can see what a card did.
+
+    The policy talks to this exactly as it would to a Run. Only `play` is
+    treated specially: the enemy HP before and after the action is the damage
+    the card actually dealt, which is the one number the state does not report
+    directly.
+    """
+
+    def __init__(self, run, tel):
+        self._run = run
+        self._tel = tel
+        self._combat = None
+        self._hand = Counter()
+
+    def __getattr__(self, name):
+        return getattr(self._run, name)
+
+    @staticmethod
+    def _enemy_hp(run):
+        cb = run.combat
+        return sum(e.hp for e in cb.enemies) if cb else 0
+
+    def state(self):
+        st = self._run.state()
+        # Count a draw whenever a card *arrives* in hand, rather than sampling
+        # the opening hand each turn. Cards drawn mid-turn are playable, and
+        # counting them as played but never drawn produced play rates above
+        # 100% for anything a draw effect fetched.
+        if st["screen"] == "combat":
+            combat = id(self._run.combat)
+            if combat != self._combat:
+                self._combat, self._hand = combat, Counter()
+            self._observe([c["key"] for c in st["combat"]["hand"]])
+        return st
+
+    def _observe(self, keys):
+        """Count everything that arrived in hand since the last look."""
+        now = Counter(keys)
+        for key, n in now.items():
+            gained = n - self._hand.get(key, 0)
+            if gained > 0:
+                self._tel.drew(key, gained)
+        self._hand = now
+
+    def apply(self, action):
+        kind = action.get("type")
+        if kind == "end_turn" and self._run.combat is not None:
+            self._tel.saw_hand_at_turn_end(
+                [c.to_dict() for c in self._run.combat.hand])
+            return self._run.apply(action)
+        if kind != "play" or self._run.combat is None:
+            return self._run.apply(action)
+
+        hand = self._run.combat.hand
+        idx = action.get("idx")
+        card = hand[idx] if isinstance(idx, int) and 0 <= idx < len(hand) else None
+        before = self._enemy_hp(self._run)
+        out = self._run.apply(action)
+        if card is not None:
+            key = card.key
+            info = CARDS.get(key) or {}
+            cost = info.get("cost")
+            cost = cost if isinstance(cost, int) and cost >= 0 else 1
+            self._tel.saw_play(key, cost, before - self._enemy_hp(self._run))
+        if self._run.combat is not None:
+            # A card that draws cards puts them in hand before we look again;
+            # folding them into the baseline instead of counting them is what
+            # let Heavy Blade report a 104% play rate.
+            self._observe([c.key for c in self._run.combat.hand])
+        return out
+
+
+def simulate(cls, seed, policy_cls=GreedyPolicy, max_steps=MAX_STEPS,
+             telemetry=None):
     run = Run(cls, seed=seed)
+    if telemetry is not None:
+        run = _Watched(run, telemetry)
     policy = policy_cls(seed=seed)
     steps = 0
     stalled = False
@@ -349,11 +526,11 @@ def simulate(cls, seed, policy_cls=GreedyPolicy, max_steps=MAX_STEPS):
                   steps=steps, stalled=stalled)
 
 
-def batch(classes, runs, policy_cls, seed0=0, progress=None):
+def batch(classes, runs, policy_cls, seed0=0, progress=None, telemetry=None):
     out = []
     for cls in classes:
         for i in range(runs):
-            out.append(simulate(cls, seed0 + i, policy_cls))
+            out.append(simulate(cls, seed0 + i, policy_cls, telemetry=telemetry))
             if progress:
                 progress(cls, i + 1, runs)
     return out
@@ -411,6 +588,77 @@ def print_report(rows, policy_name, elapsed, out=None):
         print(f"  WARNING: {stalled} runs hit the step cap without finishing", file=out)
 
 
+def print_cards(rows, out=None, top=12, min_draws=30):
+    """The two ends of the pool: what never gets played, and what pays best."""
+    out = out or sys.stdout
+    rows = [r for r in rows if r["drawn"] >= min_draws]
+    if not rows:
+        print("\n  (not enough draws to say anything about individual cards)", file=out)
+        return
+
+    print(f"\n  Card telemetry — {len(rows)} cards drawn at least {min_draws} times\n",
+          file=out)
+
+    # Curses and statuses are unplayable on purpose; listing them as the cards
+    # nobody plays is true and useless.
+    playable = [r for r in rows if r["type"] not in ("CURSE", "STATUS")]
+
+    # Raw play rate measures the player, not the card, in two ways that both
+    # have to be divided out.
+    #
+    # Cost: across 231 cards the play rate slides 95% -> 59% -> 32% -> 22% from
+    # cost 0 to cost 3, which is a fact about having three energy a turn.
+    #
+    # Type: even at equal cost, attacks run +14 points and skills -12, because
+    # GreedyPolicy scores an attack by the damage it can read off the card and
+    # falls back to a flat guess for a skill whose text it cannot parse. That
+    # is the policy's blind spot, not the card's fault.
+    #
+    # So a card is compared only with cards that cost the same *and* do the
+    # same kind of thing. What is left is the closest thing to a quality signal
+    # this tool can honestly produce — and it is still only a hint.
+    peers = {}
+    for r in playable:
+        peers.setdefault((str(r["cost"]), r["type"]), []).append(r["play_rate"])
+    norm = {k: sum(v) / len(v) for k, v in peers.items()}
+    for r in playable:
+        r["vs_peers"] = r["play_rate"] - norm[(str(r["cost"]), r["type"])]
+
+    dead = sorted(playable, key=lambda r: (r["vs_peers"], -r["drawn"]))[:top]
+    print(f"  Least played vs same cost+type{'':<2}{'cost':>5}{'type':>8}"
+          f"{'drawn':>7}{'play %':>9}{'vs peers':>10}", file=out)
+    print("  " + "─" * 72, file=out)
+    for r in dead:
+        print(f"  {r['name'][:28]:<30}{str(r['cost']):>5}{r['type'][:6]:>8}"
+              f"{r['drawn']:>7}{r['play_rate']*100:>8.1f}%"
+              f"{r['vs_peers']*100:>9.1f}", file=out)
+
+    free = [r for r in playable
+            if r["cost"] == 0 and r["type"] == "ATTACK" and r["played"] >= 20]
+    if free:
+        print(f"\n  Free attacks (damage per energy is undefined, not zero)"
+              f"{'':<3}{'played':>7}{'dmg/play':>10}", file=out)
+        print("  " + "─" * 62, file=out)
+        for r in sorted(free, key=lambda r: -r["dmg_per_play"]):
+            print(f"  {r['name'][:28]:<30}{'':>8}{r['played']:>8}"
+                  f"{r['dmg_per_play']:>10.1f}", file=out)
+
+    attacks = [r for r in rows if r["type"] == "ATTACK" and r["played"] >= 20
+               and r["dmg_per_energy"] is not None]
+    if attacks:
+        best = sorted(attacks, key=lambda r: -r["dmg_per_energy"])
+        print(f"\n  Damage per energy{'':<13}{'played':>8}{'dmg/play':>10}"
+              f"{'dmg/energy':>12}", file=out)
+        print("  " + "─" * 62, file=out)
+        for r in best[:top // 2]:
+            print(f"  {r['name'][:28]:<30}{r['played']:>8}{r['dmg_per_play']:>10.1f}"
+                  f"{r['dmg_per_energy']:>12.1f}", file=out)
+        print("  " + " " * 30 + "…", file=out)
+        for r in best[-(top // 2):]:
+            print(f"  {r['name'][:28]:<30}{r['played']:>8}{r['dmg_per_play']:>10.1f}"
+                  f"{r['dmg_per_energy']:>12.1f}", file=out)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="spire-sim", description="Play the game thousands of times and count.")
@@ -421,6 +669,8 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0, help="first seed; runs use seed+i")
     ap.add_argument("--json", metavar="PATH", help="also write the raw rows here")
     ap.add_argument("--quiet", action="store_true", help="no progress line")
+    ap.add_argument("--cards", action="store_true",
+                    help="also report per-card play rates and damage per energy")
     ap.add_argument("--fail-outside", metavar="LO,HI",
                     help="exit 1 if any class's win rate falls outside this "
                          "percentage band, e.g. 25,65 — for CI")
@@ -438,19 +688,26 @@ def main(argv=None):
             print(f"\r  {cls:<14} {i}/{n}", end="", file=sys.stderr, flush=True)
 
     started = time.time()
-    results = batch(classes, args.runs, POLICIES[args.policy], args.seed, progress)
+    tel = Telemetry() if args.cards else None
+    results = batch(classes, args.runs, POLICIES[args.policy], args.seed,
+                    progress, telemetry=tel)
     elapsed = time.time() - started
     if not args.quiet:
         print("\r" + " " * 40 + "\r", end="", file=sys.stderr)
 
     rows = summarise(results)
     print_report(rows, args.policy, elapsed)
+    if tel is not None:
+        print_cards(tel.rows())
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as f:
-            json.dump({"policy": args.policy, "runs_per_class": args.runs,
+            payload = {"policy": args.policy, "runs_per_class": args.runs,
                        "seed": args.seed, "summary": rows,
-                       "runs": [r.as_dict() for r in results]}, f, indent=1)
+                       "runs": [r.as_dict() for r in results]}
+            if tel is not None:
+                payload["cards"] = tel.rows()
+            json.dump(payload, f, indent=1)
         print(f"  wrote {args.json}")
 
     if args.fail_outside:

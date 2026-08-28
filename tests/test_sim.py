@@ -16,6 +16,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from spire_of_ash import sim                              # noqa: E402
+from spire_of_ash.content.cards import CARDS              # noqa: E402
 from spire_of_ash.content.pools import CLASSES            # noqa: E402
 
 
@@ -104,3 +105,88 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestAttackParsing(unittest.TestCase):
+    """The policy reads damage off the card text, so the reading has to be right.
+
+    Undercounting multi-hit and AoE attacks did not cost much win rate, but it
+    badly distorted the card telemetry: Blade Dance had the best damage per
+    energy in the pool and one of the worst play rates, because the policy
+    scored "Deal 4 damage three times" as four.
+    """
+
+    def test_multi_hit_damage_is_multiplied(self):
+        # Blade Dance: "Deal 4 damage three times."
+        per_target, output = sim._attack_damage("blade_dance", False, 1)
+        self.assertEqual(per_target, 12)
+        self.assertEqual(output, 12)
+
+    def test_sweeps_count_every_enemy_towards_output_but_not_towards_lethal(self):
+        # Spark Shower: "Deal 3 damage to ALL enemies twice."
+        per_target, output = sim._attack_damage("spark_shower", False, 4)
+        self.assertEqual(per_target, 6, "each enemy still only takes 6")
+        self.assertEqual(output, 24, "but the card puts out 24 across the room")
+
+    def test_a_plain_attack_is_unchanged(self):
+        self.assertEqual(sim._attack_damage("strike", False, 3), (6, 6))
+
+    def test_upgrades_are_read_from_the_upgraded_text(self):
+        plain = sim._attack_damage("strike", False, 1)[0]
+        upped = sim._attack_damage("strike", True, 1)[0]
+        self.assertGreater(upped, plain)
+
+    def test_a_card_with_no_damage_line_reports_nothing(self):
+        self.assertEqual(sim._attack_damage("defend", False, 1), (0, 0))
+
+
+class TestTelemetry(unittest.TestCase):
+    def _gather(self, runs=2):
+        tel = sim.Telemetry()
+        sim.batch(["sentinel"], runs, sim.GreedyPolicy, telemetry=tel)
+        return tel
+
+    def test_it_sees_the_starting_deck(self):
+        tel = self._gather()
+        self.assertGreater(tel.drawn["strike"], 0)
+        self.assertGreater(tel.played["strike"], 0)
+
+    def test_no_card_is_played_more_often_than_it_is_drawn(self):
+        """A play rate over 100% means draws are being missed, not that a card
+        is unusually good — cards fetched mid-turn used to escape the count."""
+        tel = self._gather(runs=4)
+        for row in tel.rows():
+            self.assertLessEqual(
+                row["play_rate"], 1.0,
+                f"{row['name']} played {row['played']} times but drawn "
+                f"{row['drawn']}")
+
+    def test_damage_per_energy_is_undefined_for_a_free_card(self):
+        """Not zero: dividing by no energy once ranked the best cards last."""
+        tel = sim.Telemetry()
+        tel.drew("cinder_dart")
+        tel.saw_play("cinder_dart", 0, 4)
+        row = next(r for r in tel.rows() if r["key"] == "cinder_dart")
+        self.assertIsNone(row["dmg_per_energy"])
+        self.assertEqual(row["dmg_per_play"], 4)
+
+    def test_damage_per_energy_divides_by_energy_actually_spent(self):
+        tel = sim.Telemetry()
+        tel.drew("bash", 2)
+        tel.saw_play("bash", 2, 8)
+        tel.saw_play("bash", 2, 12)
+        row = next(r for r in tel.rows() if r["key"] == "bash")
+        self.assertEqual(row["dmg_per_energy"], 5.0)     # 20 damage / 4 energy
+        self.assertEqual(row["dmg_per_play"], 10.0)
+
+    def test_rows_carry_the_cost_so_a_report_can_normalise_by_it(self):
+        tel = self._gather()
+        for row in tel.rows():
+            self.assertEqual(row["cost"], (CARDS.get(row["key"]) or {}).get("cost"))
+
+    def test_telemetry_does_not_change_the_run(self):
+        """The tap is a wrapper; it must not perturb what it measures."""
+        plain = sim.simulate("sentinel", seed=5)
+        watched = sim.simulate("sentinel", seed=5, telemetry=sim.Telemetry())
+        self.assertEqual(plain.as_dict(), watched.as_dict())
+
