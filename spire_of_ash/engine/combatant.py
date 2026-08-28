@@ -92,8 +92,7 @@ class Enemy(Combatant):
         self.history = []
         self.intent = None
         self.allies = [self]
-        if act >= B.FINAL_ACT:
-            self.st["strength"] += B.ACT3_ENEMY_STRENGTH
+        self.st["strength"] += B.enemy_strength(act)
         if strength:
             self.st["strength"] += strength
 

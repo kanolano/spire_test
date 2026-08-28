@@ -371,4 +371,98 @@ MONSTERS = {
         "Ember Wave": mv("attack", 10, fn=_add_cards("burn", 2, to_draw=True)),
     }, pick=cycle_pick(["Molten Bulwark", "Rain of Ash", "Maternal Fury",
                         "Ashen Maul", "Ember Wave", "Rain of Ash"])),
+    # ── act 4: The Hollow Above ────────────────────────────────────────────
+    # Everything below the crown burns. Above it the fire has already gone out,
+    # so this act is built out of cold and subtraction rather than damage: it
+    # takes your Block away, your Strength away, your cards away, and heals
+    # itself on what it takes. A player who has spent three acts learning to
+    # out-damage the Spire has to learn something else here.
+
+    "hollow_choir": dict(name="Hollow Choir", hp=(46, 54), moves={
+        "Dirge": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "weak", 2),
+                                                cb.apply(cb.player, "frail", 2))),
+        "Hush": mv("attack", 9, fn=_block(8)),
+        "Descant": mv("attack", 5, hits=3),
+    }, pick=lambda e: "Dirge" if e.turn == 0 else weighted_pick(
+        [("Descant", 40, 2), ("Hush", 35, 2), ("Dirge", 25, 1)])(e)),
+
+    # Heals itself for what it takes, so ignoring it is how the fight gets
+    # long. The counter is to kill it first, which is the lesson.
+    "pale_lantern": dict(name="Pale Lantern", hp=(38, 44), moves={
+        "Draw Down": mv("attack", 8, fn=lambda cb, e: cb.heal(e, 6)),
+        "Gutter": mv("debuff", fn=_debuff("weak", 2)),
+        "Flare": mv("attack", 13),
+    }, pick=weighted_pick([("Draw Down", 45, 2), ("Flare", 35, 2), ("Gutter", 20, 1)])),
+
+    # Grows every turn it is left alone and never blocks: a race, not a wall.
+    "starveling": dict(name="Starveling", hp=(52, 60), moves={
+        "Hunger": mv("buff", fn=_grow(3)),
+        "Rend": mv("attack", 12),
+        "Swallow": mv("attack", 16, fn=lambda cb, e: cb.heal(e, 4)),
+    }, pick=lambda e: "Hunger" if e.turn == 0 else weighted_pick(
+        [("Rend", 40, 2), ("Swallow", 35, 2), ("Hunger", 25, 1)])(e)),
+
+    "rime_husk": dict(name="Rime Husk", hp=(60, 70), moves={
+        "Settle": mv("block", fn=lambda cb, e: (cb.gain_block(e, 18),
+                                                cb.apply(e, "thorns", 3))),
+        "Calve": mv("attack", 14),
+        "Splinter": mv("attack", 6, hits=2, fn=_add_cards("slimed", 1)),
+    }, pick=cycle_pick(["Settle", "Calve", "Splinter"])),
+
+    "sky_leech": dict(name="Sky Leech", hp=(34, 40), moves={
+        "Latch": mv("attack", 4, hits=3, fn=lambda cb, e: cb.heal(e, 5)),
+        "Bleed Out": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "frail", 3),
+                                                    cb.gain_block(e, 6))),
+    }, pick=weighted_pick([("Latch", 65, 2), ("Bleed Out", 35, 1)])),
+
+    # Strips Strength rather than dealing with it, which is what makes the
+    # scaling classes actually think in this act.
+    "unmaker": dict(name="Unmaker", hp=(56, 64), moves={
+        "Undo": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "strength", -2),
+                                               cb.apply(cb.player, "weak", 1))),
+        "Erase": mv("attack", 15),
+        "Void Step": mv("block", fn=lambda cb, e: (cb.gain_block(e, 12),
+                                                   cb.apply(e, "strength", 2))),
+    }, pick=lambda e: "Undo" if e.turn == 0 else weighted_pick(
+        [("Erase", 45, 2), ("Void Step", 30, 2), ("Undo", 25, 2)])(e)),
+
+    # ── act 4 elites ──
+    "famine_saint": dict(name="Famine Saint", hp=(150, 160), elite=True, moves={
+        "Benediction": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "weak", 3),
+                                                      cb.apply(cb.player, "frail", 3),
+                                                      cb.gain_block(e, 10))),
+        "Tithe": mv("attack", 18, fn=lambda cb, e: cb.heal(e, 8)),
+        "Fast": mv("attack", 7, hits=3, fn=_add_cards("wound", 1)),
+    }, pick=lambda e: "Benediction" if e.turn == 0 else weighted_pick(
+        [("Tithe", 40, 2), ("Fast", 35, 2), ("Benediction", 25, 1)])(e)),
+
+    "void_warden": dict(name="Void Warden", hp=(165, 178), elite=True, moves={
+        "Seal": mv("block", fn=lambda cb, e: (cb.gain_block(e, 22),
+                                              cb.apply(e, "thorns", 4))),
+        "Judgement": mv("attack", 24),
+        "Nullify": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "strength", -3),
+                                                  cb.apply(cb.player, "vulnerable", 2))),
+    }, pick=cycle_pick(["Seal", "Judgement", "Nullify", "Judgement"])),
+
+    # ── act 4 bosses ──
+    # The Spire's own first ember, still burning where nothing else does.
+    # Grows all fight and punishes a long one, so it is the act's answer to a
+    # deck that wins by outlasting things.
+    "first_ember": dict(name="The First Ember", hp=(230, 230), boss=True, moves={
+        "Kindling": mv("buff", fn=lambda cb, e: (cb.apply(e, "strength", 3),
+                                                 cb.gain_block(e, 10))),
+        "Sunder": mv("attack", 20),
+        "Ashfall": mv("attack", 6, hits=4, fn=_add_cards("burn", 2)),
+        "Rekindle": mv("attack", 12, fn=lambda cb, e: cb.heal(e, 12)),
+    }, pick=cycle_pick(["Kindling", "Sunder", "Ashfall", "Rekindle", "Sunder"])),
+
+    "the_unwritten": dict(name="The Unwritten", hp=(245, 245), boss=True, moves={
+        "Blank Page": mv("debuff", fn=lambda cb, e: (cb.apply(cb.player, "strength", -2),
+                                                     cb.apply(cb.player, "frail", 2),
+                                                     cb.gain_block(e, 14))),
+        "Unname": mv("attack", 22),
+        "Recite Nothing": mv("attack", 5, hits=5),
+        "Forget": mv("debuff", fn=lambda cb, e: (_add_cards("wound", 2)(cb, e),
+                                                 cb.apply(cb.player, "weak", 2))),
+    }, pick=cycle_pick(["Blank Page", "Unname", "Recite Nothing", "Forget", "Unname"])),
 }

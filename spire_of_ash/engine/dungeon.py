@@ -130,6 +130,26 @@ ACT_POOLS = {
                 ["grave_wraith", "shriek_bat"], ["grave_wraith", "cinder_revenant"]],
         elite=["book_of_stabbing", "taskmaster", "ash_warden", "ashbound_colossus"],
         boss=["ashen_sovereign", "cinder_warmother"]),
+    # Act 4 keeps a few of the Crown's survivors so the climb still feels
+    # continuous, but the shape of the act is its own: things that drain, strip
+    # and heal rather than things that hit hard.
+    4: dict(
+        weak=[["hollow_choir"], ["pale_lantern", "pale_lantern"], ["starveling"],
+              ["rime_husk"], ["sky_leech", "sky_leech"], ["unmaker"],
+              ["hollow_choir", "sky_leech"], ["grave_wraith"],
+              ["pale_lantern", "starveling"]],
+        strong=[["hollow_choir", "hollow_choir"], ["starveling", "starveling"],
+                ["unmaker", "pale_lantern"], ["rime_husk", "sky_leech", "sky_leech"],
+                ["unmaker", "unmaker"], ["starveling", "hollow_choir"],
+                ["rime_husk", "rime_husk"],
+                ["sky_leech", "sky_leech", "sky_leech"],
+                ["cinder_revenant", "unmaker"], ["grave_wraith", "hollow_choir"],
+                ["pale_lantern", "pale_lantern", "sky_leech"],
+                ["starveling", "unmaker"], ["rime_husk", "pale_lantern"],
+                ["ashbound_colossus"]],
+        # Nastier half last: past `super_elite_from` only these are drawn.
+        elite=["ash_warden", "famine_saint", "void_warden", "ashbound_colossus"],
+        boss=["first_ember", "the_unwritten"]),
 }
 
 

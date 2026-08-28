@@ -56,7 +56,21 @@ def ascension_ladder():
 
 # ── enemies ──
 ACT_HP_SCALING = 0.18          # +18% enemy HP per act beyond the first
-ACT3_ENEMY_STRENGTH = 1
+ACT3_ENEMY_STRENGTH = 1        # kept: the act-3 value, referenced by name below
+
+# Enemies come with Strength from act 3 onward. This is a table rather than
+# `act >= FINAL_ACT` because that spelling silently disarmed act 3 the moment a
+# fourth act was added — the last act was the only one that got it.
+ENEMY_STRENGTH_BY_ACT = {3: ACT3_ENEMY_STRENGTH, 4: 2}
+
+
+def enemy_strength(act):
+    """Free Strength every enemy in this act starts with.
+
+    Clamped upward like `act_profile`, so an act past the last one keeps the
+    last one's teeth instead of quietly losing them.
+    """
+    return ENEMY_STRENGTH_BY_ACT.get(min(max(act, 1), FINAL_ACT), 0)
 
 # ── player ──
 STARTING_GOLD = 99
@@ -114,7 +128,7 @@ MID_REST_FLOOR = 6             # a second guaranteed campfire, mid-act
 # all on a screen titled "Choose your path".
 MAP_BRANCH_UP = 0.75
 MAP_BRANCH_DOWN = 0.7
-FINAL_ACT = 3
+FINAL_ACT = 4
 # Cumulative cutoffs used when rolling a node type. Monsters were 53% of every
 # map, and a trash fight cost a median of 1 HP — half the game was a free click.
 NODE_ELITE = 0.16
@@ -157,6 +171,16 @@ ACT_PROFILES = {
         elite_from=3, super_elite_from=9,
         # brutal: elites everywhere, campfires scarce, shops rare
         node=dict(elite=0.24, rest=0.20, event=0.38, shop=0.45),
+        width=(3, 5),
+    ),
+    4: dict(
+        name="The Hollow Above", theme="hollow",
+        floors=18, treasure_floor=11, rest_floors=(8, 16),
+        elite_from=2, super_elite_from=8,
+        # Above the crown there is nothing left to trade with: the fewest
+        # campfires and the fewest shops in the game, and an elite possible
+        # from the second floor.
+        node=dict(elite=0.28, rest=0.18, event=0.36, shop=0.41),
         width=(3, 5),
     ),
 }

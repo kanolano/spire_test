@@ -318,6 +318,82 @@ const S: Record<string, Spec> = {
     front: crown("regal", 24) + eyes("regal", { n: 2, y: 36, spread: 12, r: 3.2 })
       + embers("regal", 30, 7) + plates("regal", 50, 34, 3) + weapon("regal", "club"),
   },
+
+  /* ── act 4: The Hollow Above ──
+     The first three acts are lit by fire — ash, ember and regal gold. This one
+     is drawn almost entirely in the cold ramps, so walking into act 4 reads as
+     a change of temperature before a single name is shown. The one warm sprite
+     up here is The First Ember, which is the point of it. */
+  hollow_choir: {
+    // A draped spectre was already taken by the Grave Wraith, and on the
+    // contact sheet the two were the same creature in different sizes. Wide
+    // and low with a row of eyes across it reads as several things singing at
+    // once, which is the name, and cannot be mistaken for a lone ghost.
+    ramp: "spectre", shape: "blob", w: 56, h: 34, float: true,
+    front: eyes("spectre", { n: 5, y: 46, spread: 11, r: 2.6 })
+      + tendrils("spectre", 62, 6, 16),
+  },
+  pale_lantern: {
+    ramp: "spectre", shape: "orb", w: 32, h: 32, float: true,
+    front: eyes("spectre", { n: 1, y: 46, r: 6 }) + embers("spectre", 34, 6),
+  },
+  starveling: {
+    ramp: "bone", shape: "tall", w: 34, h: 62,
+    // Thin and long-limbed: the silhouette should look like it is owed food.
+    back: limbs("bone", 58, 24, 24, 12),
+    front: eyes("bone", { y: 34, spread: 8, r: 2.4 }) + jaw("bone", 48, 18)
+      + plates("bone", 58, 22, 4),
+  },
+  rime_husk: {
+    ramp: "brine", shape: "shard", w: 48, h: 50,
+    front: eyes("brine", { n: 1, y: 48, r: 4.5 }) + spikes("brine", 30, 38, 6, 12)
+      + plates("brine", 56, 32, 2),
+  },
+  sky_leech: {
+    ramp: "spectre", shape: "coil", w: 54, h: 40, float: true,
+    // Head at the tip of the coil, the way the Jaw Worm's is.
+    front: `<g transform="translate(12,-4)">`
+      + eyes("spectre", { n: 2, y: 50, spread: 6, r: 2 })
+      + jaw("spectre", 58, 16) + `</g>`,
+  },
+  unmaker: {
+    ramp: "spectre", shape: "tall", w: 40, h: 58,
+    // A single wide slit and nothing else on the face: everything up here has
+    // features, and the thing that removes them should be missing its own.
+    // The first pass buried a small slit behind three rows of plates and the
+    // sprite read as unfinished rather than deliberate — the blankness only
+    // works if there is visibly one thing there and it is a void.
+    front: eyes("spectre", { n: 1, y: 38, r: 8, slit: true })
+      + plates("spectre", 62, 24, 2),
+  },
+
+  /* act 4 elites */
+  famine_saint: {
+    ramp: "bone", shape: "draped", w: 46, h: 64, scale: 1.2,
+    front: crown("bone", 24) + eyes("bone", { n: 3, y: 38, spread: 9, r: 2.4 })
+      + tendrils("bone", 76, 6, 14),
+  },
+  void_warden: {
+    ramp: "stone", shape: "shard", w: 52, h: 58, scale: 1.24,
+    front: eyes("stone", { n: 1, y: 42, r: 7, slit: true })
+      + plates("stone", 52, 38, 3) + spikes("stone", 28, 36, 5, 10),
+  },
+
+  /* act 4 bosses */
+  first_ember: {
+    ramp: "regal", shape: "orb", w: 52, h: 52, scale: 1.42, float: true,
+    // The last warm thing in the act, and the only sprite in it that glows.
+    front: eyes("regal", { n: 1, y: 48, r: 8 }) + embers("regal", 30, 9)
+      + spikes("regal", 26, 40, 7, 12),
+  },
+  the_unwritten: {
+    ramp: "spectre", shape: "draped", w: 54, h: 70, scale: 1.45,
+    // Crowned like the Sovereign it stands above, and blank where every other
+    // boss has a face.
+    front: crown("spectre", 20)
+      + eyes("spectre", { n: 1, y: 36, r: 7, slit: true })
+      + plates("spectre", 54, 32, 2) + tendrils("spectre", 78, 6, 16),
+  },
 };
 
 /** A normal creature's on-screen height. Elites and bosses scale off it, and

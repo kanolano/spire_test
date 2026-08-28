@@ -121,13 +121,33 @@ python3 -m spire_of_ash.sim --ascension 5    # check a rung yourself
 
 ## How it plays
 
-Pick a class, climb a 15-floor map per act, and fight your way to the act boss.
+Pick a class, climb a map per act — four of them, 15 to 18 floors each — and
+fight your way to the act boss.
 Combat is turn-based: spend energy to play cards from your hand, block what the
 enemy telegraphs, and end your turn. Campfires heal, upgrade or purge, shops sell cards,
 relics and card removal, and `?` in-game lists every key binding.
 
 The browser UI is fully keyboard-driven — number keys play cards, `a`–`d` pick
 targets and map nodes, `e` ends the turn, `i` opens your deck.
+
+## The acts
+
+| Act | | |
+| --- | --- | --- |
+| 1 | The Ashen Reach | 15 floors. Elites are rare and campfires common. |
+| 2 | The Molten Works | 16 floors. More elites, fewer free rests. |
+| 3 | The Sovereign's Crown | 17 floors. Elites everywhere, shops scarce. |
+| 4 | The Hollow Above | 18 floors. The fewest campfires and shops in the game, and an elite possible from the second floor. |
+
+The first three acts are lit by fire and get bigger as they go. The fourth is a
+change of kind rather than of size: everything below the crown burns, and above
+it the fire has already gone out, so the act is built out of **cold and
+subtraction** — things that drain your Block, strip your Strength, put cards in
+your deck and heal themselves on what they take. Three acts of learning to
+out-damage the Spire, then one where that is not the answer. Its ten creatures
+are drawn almost entirely in the cold ramps, so the change of temperature reads
+before a single name does; the one warm thing left up there is The First Ember,
+which is the point of it.
 
 ## The climbers
 

@@ -521,3 +521,70 @@ class TestActOneBossParity(unittest.TestCase):
         self.assertLess(hi / lo, 2.5,
                         f"act-1 boss damage per rotation is lopsided: {g} vs {s}")
 
+
+class TestFourthAct(unittest.TestCase):
+    """The Hollow Above.
+
+    The act exists to be a change of kind rather than a change of size: three
+    acts of out-damaging the Spire, then one that drains, strips and heals. If
+    a later edit turns it into act 3 with bigger numbers, these fail.
+    """
+
+    ACT4 = ("hollow_choir", "pale_lantern", "starveling", "rime_husk",
+            "sky_leech", "unmaker", "famine_saint", "void_warden",
+            "first_ember", "the_unwritten")
+
+    def test_the_run_actually_reaches_a_fourth_act(self):
+        self.assertGreaterEqual(B.FINAL_ACT, 4)
+        self.assertIn(4, ACT_POOLS)
+        self.assertEqual(B.act_profile(4)["name"], "The Hollow Above")
+
+    def test_extending_the_run_did_not_disarm_act_three(self):
+        """`act >= FINAL_ACT` used to spell this, and adding act 4 would have
+        silently taken act 3's Strength away."""
+        self.assertEqual(B.enemy_strength(3), B.ACT3_ENEMY_STRENGTH)
+        self.assertGreater(B.enemy_strength(4), B.enemy_strength(3))
+        self.assertEqual(B.enemy_strength(1), 0)
+
+    def test_it_is_the_hardest_act_to_walk_through(self):
+        third, fourth = B.act_profile(3), B.act_profile(4)
+        self.assertGreater(fourth["node"]["elite"], third["node"]["elite"])
+        self.assertLess(fourth["node"]["rest"], third["node"]["rest"])
+        self.assertGreaterEqual(fourth["floors"], third["floors"])
+
+    def test_its_creatures_exist_and_are_its_own(self):
+        for key in self.ACT4:
+            with self.subTest(key=key):
+                self.assertIn(key, MONSTERS)
+        pool = ACT_POOLS[4]
+        used = {k for g in pool["weak"] + pool["strong"] for k in g}
+        used |= set(pool["elite"]) | set(pool["boss"])
+        self.assertTrue(set(self.ACT4) & used, "act 4 does not use its own bestiary")
+
+    def test_it_drains_rather_than_only_hitting(self):
+        """The act's identity: healing itself, and taking Strength off you."""
+        heals = [k for k in self.ACT4
+                 if any("heal" in _src(m.get("fn")) for m in MONSTERS[k]["moves"].values())]
+        self.assertGreaterEqual(len(heals), 3, "nothing in act 4 heals itself")
+        strips = [k for k in self.ACT4
+                  if any("strength" in _src(m.get("fn")) and "-" in _src(m.get("fn"))
+                         for m in MONSTERS[k]["moves"].values())]
+        self.assertTrue(strips, "nothing in act 4 strips Strength")
+
+    def test_both_of_its_bosses_are_bosses_and_neither_is_small(self):
+        for key in ACT_POOLS[4]["boss"]:
+            spec = MONSTERS[key]
+            self.assertTrue(spec.get("boss"), f"{key} is not flagged a boss")
+            self.assertGreaterEqual(spec["hp"][0], 200, f"{key} is boss-sized")
+
+
+def _src(fn):
+    """The source of a move's effect lambda, for asking what it does."""
+    import inspect
+    if fn is None:
+        return ""
+    try:
+        return inspect.getsource(fn)
+    except (OSError, TypeError):
+        return ""
+

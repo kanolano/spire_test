@@ -14,6 +14,9 @@ const ACT = {
   1: { sky: ["#241d33", "#140f1e"], far: "#1d1830", near: "#171227", haze: "#3a2a4a" },
   2: { sky: ["#2a1d24", "#170f16"], far: "#241722", near: "#1c1119", haze: "#4a2a34" },
   3: { sky: ["#2c2118", "#160f0c"], far: "#271a12", near: "#1d130d", haze: "#5a3520" },
+  // Act 4 turns the temperature over: the first three warm up from violet to
+  // ember, and the room above the crown is the only cold one in the game.
+  4: { sky: ["#1a2331", "#0b0f16"], far: "#16202c", near: "#101822", haze: "#2f4a63" },
 } as const;
 
 type Kind = "monster" | "elite" | "boss";
@@ -44,7 +47,8 @@ function ridge(
   return `<polygon points="${pts.join(" ")}" fill="${fill}" opacity="${opacity}"/>`;
 }
 
-const clampAct = (act: number) => Math.min(3, Math.max(1, act)) as 1 | 2 | 3;
+const clampAct = (act: number) =>
+  Math.min(4, Math.max(1, act)) as 1 | 2 | 3 | 4;
 
 /**
  * The same room, seen from outside, behind the map.
