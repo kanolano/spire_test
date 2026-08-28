@@ -36,6 +36,47 @@ python3 -m unittest discover -s tests
 
 No dependencies needed. `pytest` works too if you have it.
 
+## Balance
+
+The suite says whether the rules are obeyed. It says nothing about whether the
+game is *fair*, and seven classes across 256 cards is well past what anyone can
+hold in their head. So there is a simulator:
+
+```sh
+python3 -m spire_of_ash.sim                      # 60 runs per class
+python3 -m spire_of_ash.sim --runs 500           # tighter numbers
+python3 -m spire_of_ash.sim --classes hexbinder  # one climber
+python3 -m spire_of_ash.sim --json out.json      # raw rows, for a diff
+```
+
+It plays the real engine through the same `apply`/`state` machine both clients
+use, so it cannot drift from the game. Every run is seeded from `--seed` plus
+the run index, which makes a report reproducible and two reports comparable run
+for run.
+
+`GreedyPolicy` is a **floor, not a ceiling**: it reads damage and Block off the
+card text, kills what it can reach and blocks what it cannot, and never plans a
+turn ahead. Its absolute win rate is therefore not "the" win rate. What it is
+good for is comparison — between classes, between acts, and between two commits
+— because the same crude player meets all of them. `--policy random` is the
+scripted flailer the tests use, kept as the true floor.
+
+`--fail-outside 25,65` exits non-zero if any class's win rate leaves that band,
+so a content change that quietly guts a climber can fail CI rather than ship.
+
+Numbers move when the game or the policy changes, so treat any figure here as a
+timestamp rather than a fact. What the first 2,100-run report found:
+
+- **The act-1 boss is where runs end.** 57% of runs finish in act 1, and the
+  two act-1 bosses account for 37% of all deaths.
+- **The two act-1 bosses are not interchangeable.** The draw is a clean 50/50,
+  but The Guardian kills 554 runs to the Slime Boss's 231 — so which boss the
+  seed hands you matters more than anything you do about it.
+- **More cards is better here**, which is the opposite of the genre's usual
+  advice. Capping the deck at 22 cards cost the Emberbrewer two thirds of its
+  win rate, so card rewards are not the trap they are in the games this one is
+  in the spirit of.
+
 ## How it plays
 
 Pick a class, climb a 15-floor map per act, and fight your way to the act boss.
