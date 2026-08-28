@@ -10,7 +10,7 @@ from .combatant import Enemy
 NODE_TYPES = ("monster", "elite", "event", "rest", "shop", "treasure", "boss")
 
 
-def generate_map(rng, act=1):
+def generate_map(rng, act=1, ascension=0):
     """Build one act's map from its profile.
 
     A profile (see balance.ACT_PROFILES) decides the act's height, where its
@@ -20,6 +20,7 @@ def generate_map(rng, act=1):
     node on a floor is reachable from the one below.
     """
     prof = B.act_profile(act)
+    elite_bonus = B.ascension_mods(ascension)["elite_chance"]
     floors_per_act = prof["floors"]
     lo_w, hi_w = prof["width"]
     treasure_floor = prof["treasure_floor"]
@@ -36,7 +37,8 @@ def generate_map(rng, act=1):
         elif f == last - 1 or f in rest_floors:
             types = ["rest"] * rng.randint(lo_w, min(lo_w + 1, hi_w))
         else:
-            types = [_roll_node(rng, f, prof) for _ in range(rng.randint(lo_w, hi_w))]
+            types = [_roll_node(rng, f, prof, elite_bonus)
+                     for _ in range(rng.randint(lo_w, hi_w))]
         floors.append([dict(type=t, edges=[]) for t in types])
 
     for f in range(floors_per_act - 1):
@@ -44,10 +46,10 @@ def generate_map(rng, act=1):
     return floors
 
 
-def _roll_node(rng, floor, prof):
+def _roll_node(rng, floor, prof, elite_bonus=0.0):
     n = prof["node"]
     r = rng.random()
-    if floor >= prof["elite_from"] and r < n["elite"]:
+    if floor >= prof["elite_from"] and r < n["elite"] + elite_bonus:
         return "elite"
     if floor >= prof["elite_from"] and r < n["rest"]:
         return "rest"
@@ -131,11 +133,18 @@ ACT_POOLS = {
 }
 
 
-def make_encounter(rng, act, kind, floor):
+def make_encounter(rng, act, kind, floor, ascension=0):
     """Enemies plus a label for one combat node."""
     pool = ACT_POOLS[min(act, B.FINAL_ACT)]
+    asc = B.ascension_mods(ascension)
+    # Elites and bosses carry the extra `tough_hp` on top of the general rise,
+    # so the ladder can make the fights that already end runs harder without
+    # turning every corridor fight into a slog.
+    tough = 1 + asc["enemy_hp"] + asc["tough_hp"]
+    plain = 1 + asc["enemy_hp"]
     if kind == "boss":
-        return [Enemy(rng.choice(pool["boss"]), act, rng)], "BOSS"
+        return [Enemy(rng.choice(pool["boss"]), act, rng, hp_mult=tough,
+                      strength=asc["boss_strength"])], "BOSS"
     if kind == "elite":
         elites = pool["elite"]
         prof = B.act_profile(act)
@@ -145,7 +154,8 @@ def make_encounter(rng, act, kind, floor):
         # Stabbing, Ash Warden). Early on, any elite is fair game.
         if sef is not None and floor >= sef and len(elites) > 1:
             elites = elites[len(elites) // 2:]
-            return [Enemy(rng.choice(elites), act, rng)], "SUPER-ELITE"
-        return [Enemy(rng.choice(elites), act, rng)], "ELITE"
+            return [Enemy(rng.choice(elites), act, rng,
+                          hp_mult=tough)], "SUPER-ELITE"
+        return [Enemy(rng.choice(elites), act, rng, hp_mult=tough)], "ELITE"
     group = rng.choice(pool["weak"] if floor < 3 else pool["strong"])
-    return [Enemy(k, act, rng) for k in group], "COMBAT"
+    return [Enemy(k, act, rng, hp_mult=plain) for k in group], "COMBAT"

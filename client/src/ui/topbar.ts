@@ -31,8 +31,12 @@ export function renderTop() {
   // No run in progress yet — the placeholder player behind the select screen
   // is not yours.
   $("#top").style.visibility = st.screen === "select" ? "hidden" : "visible";
+  // The ascension is worth carrying in the corner all run: it is the reason
+  // the numbers look the way they do, and it is not visible anywhere else
+  // once the select screen is gone.
   $("#s-act").textContent =
-    `Act ${st.act}` + (st.floor > 0 ? ` · Floor ${st.floor}` : "");
+    `Act ${st.act}` + (st.floor > 0 ? ` · Floor ${st.floor}` : "")
+    + (st.ascension ? ` · A${st.ascension}` : "");
 
   const pct = Math.max(0, p.hp) / p.max_hp * 100;
   $("#s-hp").style.width = pct + "%";

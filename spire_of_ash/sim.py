@@ -33,6 +33,7 @@ import sys
 import time
 from collections import Counter
 
+from . import balance as B
 from .content.cards import CARDS
 from .content.pools import CLASSES
 from .engine.errors import InvalidAction
@@ -94,8 +95,9 @@ def _attack_damage(key, upgraded, alive):
 class Result:
     """One finished run, flattened to the numbers a report cares about."""
 
-    __slots__ = ("cls", "seed", "won", "act", "floor", "floors_cleared",
-                 "elites_killed", "killer", "deck", "gold", "steps", "stalled")
+    __slots__ = ("cls", "seed", "ascension", "won", "act", "floor",
+                 "floors_cleared", "elites_killed", "killer", "deck", "gold",
+                 "steps", "stalled")
 
     def __init__(self, **kw):
         for k in self.__slots__:
@@ -492,8 +494,8 @@ class _Watched:
 
 
 def simulate(cls, seed, policy_cls=GreedyPolicy, max_steps=MAX_STEPS,
-             telemetry=None):
-    run = Run(cls, seed=seed)
+             telemetry=None, ascension=0):
+    run = Run(cls, seed=seed, ascension=ascension)
     if telemetry is not None:
         run = _Watched(run, telemetry)
     policy = policy_cls(seed=seed)
@@ -519,18 +521,21 @@ def simulate(cls, seed, policy_cls=GreedyPolicy, max_steps=MAX_STEPS,
         steps += 1
 
     st = run.state()
-    return Result(cls=cls, seed=seed, won=run.screen == "win", act=st["act"],
+    return Result(cls=cls, seed=seed, ascension=ascension,
+                  won=run.screen == "win", act=st["act"],
                   floor=st["floor"], floors_cleared=st["floors_cleared"],
                   elites_killed=st["elites_killed"], killer=st["killer"],
                   deck=st["player"]["deck_size"], gold=st["player"]["gold"],
                   steps=steps, stalled=stalled)
 
 
-def batch(classes, runs, policy_cls, seed0=0, progress=None, telemetry=None):
+def batch(classes, runs, policy_cls, seed0=0, progress=None, telemetry=None,
+          ascension=0):
     out = []
     for cls in classes:
         for i in range(runs):
-            out.append(simulate(cls, seed0 + i, policy_cls, telemetry=telemetry))
+            out.append(simulate(cls, seed0 + i, policy_cls, telemetry=telemetry,
+                                ascension=ascension))
             if progress:
                 progress(cls, i + 1, runs)
     return out
@@ -565,13 +570,15 @@ def summarise(results):
     return rows
 
 
-def print_report(rows, policy_name, elapsed, out=None):
+def print_report(rows, policy_name, elapsed, out=None, ascension=0):
     # Bound at call time, not at import: a default of sys.stdout is
     # captured when the module loads, which makes the report immune to
     # redirect_stdout and anything else that swaps the stream later.
     out = out or sys.stdout
     total = sum(r["runs"] for r in rows)
-    print(f"\n  {total} runs · policy: {policy_name} · {elapsed:.1f}s\n", file=out)
+    rung = f" · ascension {ascension}" if ascension else ""
+    print(f"\n  {total} runs · policy: {policy_name}{rung} · {elapsed:.1f}s\n",
+          file=out)
     print(f"  {'class':<14}{'win':>7}{'floors':>9}{'act':>7}"
           f"{'elites':>8}{'deck':>7}   most often killed by", file=out)
     print("  " + "─" * 78, file=out)
@@ -669,6 +676,8 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0, help="first seed; runs use seed+i")
     ap.add_argument("--json", metavar="PATH", help="also write the raw rows here")
     ap.add_argument("--quiet", action="store_true", help="no progress line")
+    ap.add_argument("--ascension", type=int, default=0,
+                    metavar="N", help=f"difficulty rung 0-{B.MAX_ASCENSION}")
     ap.add_argument("--cards", action="store_true",
                     help="also report per-card play rates and damage per energy")
     ap.add_argument("--fail-outside", metavar="LO,HI",
@@ -690,20 +699,21 @@ def main(argv=None):
     started = time.time()
     tel = Telemetry() if args.cards else None
     results = batch(classes, args.runs, POLICIES[args.policy], args.seed,
-                    progress, telemetry=tel)
+                    progress, telemetry=tel, ascension=args.ascension)
     elapsed = time.time() - started
     if not args.quiet:
         print("\r" + " " * 40 + "\r", end="", file=sys.stderr)
 
     rows = summarise(results)
-    print_report(rows, args.policy, elapsed)
+    print_report(rows, args.policy, elapsed, ascension=args.ascension)
     if tel is not None:
         print_cards(tel.rows())
 
     if args.json:
         with open(args.json, "w", encoding="utf-8") as f:
             payload = {"policy": args.policy, "runs_per_class": args.runs,
-                       "seed": args.seed, "summary": rows,
+                       "seed": args.seed, "ascension": args.ascension,
+                       "summary": rows,
                        "runs": [r.as_dict() for r in results]}
             if tel is not None:
                 payload["cards"] = tel.rows()

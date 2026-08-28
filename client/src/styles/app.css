@@ -883,3 +883,27 @@ body.no-motion *,body.no-motion *::before,body.no-motion *::after{
   animation-iteration-count:1 !important;
   transition-duration:.001ms !important;
 }
+
+/* ══ ascension picker ═══════════════════════════════════════════════════════ */
+/* Sits under the daily toggle on the select screen. The rungs list grows as
+   the level rises, so the cost of the choice is visible while making it. */
+.ascension{margin:14px auto 0;max-width:520px;text-align:center}
+.asc-head{display:flex;align-items:center;justify-content:center;gap:14px}
+.asc-level{min-width:230px;font-size:14px;color:var(--ink)}
+.asc-step{width:30px;height:30px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  font-size:17px;line-height:1;transition:background .14s,border-color .14s}
+.asc-step:hover:not(:disabled){background:var(--panel2);border-color:var(--gold)}
+.asc-step:disabled{opacity:.3;cursor:default}
+.asc-list{margin-top:10px;display:flex;flex-direction:column;gap:4px}
+.asc-rung{font-size:12.5px;color:var(--dim);animation:slidein .24s ease backwards}
+.asc-rung .k{display:inline-block;min-width:18px;color:var(--gold);
+  font-variant-numeric:tabular-nums}
+.asc-rung:nth-child(1){animation-delay:.02s}
+.asc-rung:nth-child(2){animation-delay:.05s}
+.asc-rung:nth-child(3){animation-delay:.08s}
+.asc-rung:nth-child(4){animation-delay:.11s}
+.asc-rung:nth-child(5){animation-delay:.14s}
+.asc-rung:nth-child(6){animation-delay:.17s}
+.asc-rung:nth-child(7){animation-delay:.20s}
+.asc-rung:nth-child(8){animation-delay:.23s}

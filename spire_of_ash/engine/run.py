@@ -29,18 +29,25 @@ from ..seeds import daily_seed
 
 
 class Run:
-    def __init__(self, cls=None, seed=None, rng=None):
+    def __init__(self, cls=None, seed=None, rng=None, ascension=0):
         self.rng = rng if rng is not None else Rng(seed)
-        self.new_run(cls)
+        self.new_run(cls, ascension=ascension)
 
     # ── lifecycle ──
-    def new_run(self, cls=None, seed=None):
+    def new_run(self, cls=None, seed=None, ascension=None):
         """With no class chosen yet the run parks on the select screen."""
         if seed is not None:
             self.rng = Rng(seed)
+        if ascension is not None:
+            self.ascension = max(0, min(int(ascension), B.MAX_ASCENSION))
         self.player = Player(cls or DEFAULT_CLASS)
+        # The ladder takes health off the top rather than off max HP: the run
+        # starts hurt, and a campfire can still buy some of it back.
+        start = B.ascension_mods(self.ascension)["start_hp"]
+        if start:
+            self.player.hp = max(1, int(self.player.max_hp * (1 + start)))
         self.act = 1
-        self.floors = generate_map(self.rng, self.act)
+        self.floors = generate_map(self.rng, self.act, self.ascension)
         self.cur_floor = -1
         self.cur_idx = 0
         self.visited = []
@@ -117,7 +124,8 @@ class Run:
         """The leaderboard row for this run."""
         return dict(act=self.act, floors=self.floors_cleared, won=won,
                     killer=self.killer, deck=len(self.player.deck),
-                    gold=self.player.gold, cls=self.player.name)
+                    gold=self.player.gold, cls=self.player.name,
+                    ascension=self.ascension)
 
     # ── action dispatch ──
     def apply(self, action):
@@ -162,7 +170,12 @@ class Run:
             seed = daily_seed()
         elif seed is not None and (not isinstance(seed, int) or isinstance(seed, bool)):
             raise InvalidAction("Seed must be a number.")
-        self.new_run(cls if cls in CLASSES else DEFAULT_CLASS, seed)
+        asc = action.get("ascension")
+        if asc is not None and (not isinstance(asc, int) or isinstance(asc, bool)):
+            raise InvalidAction("Ascension must be a number.")
+        # Omitted means "same difficulty again", so climbing again from the
+        # death screen does not quietly drop you back to level 0.
+        self.new_run(cls if cls in CLASSES else DEFAULT_CLASS, seed, asc)
 
     # ── map ──
     def _do_map(self, action):
@@ -189,7 +202,7 @@ class Run:
 
     def next_act(self):
         self.act += 1
-        self.floors = generate_map(self.rng, self.act)
+        self.floors = generate_map(self.rng, self.act, self.ascension)
         self.cur_floor = -1
         self.cur_idx = 0
         self.visited = []
@@ -202,7 +215,8 @@ class Run:
 
     # ── combat ──
     def start_combat(self, kind):
-        enemies, label = make_encounter(self.rng, self.act, kind, self.cur_floor)
+        enemies, label = make_encounter(self.rng, self.act, kind,
+                                        self.cur_floor, self.ascension)
         cb = Combat(self.player, enemies, self.rng,
                     f"{label} — floor {self.cur_floor + 1}", kind, fx=self.fx)
         self.combat = cb
@@ -351,7 +365,8 @@ class Run:
     def _do_rest(self, action):
         self._need("rest")
         p = self.player
-        p.hp = min(p.max_hp, p.hp + max(1, int(p.max_hp * B.REST_HEAL_FRACTION)))
+        fraction = B.REST_HEAL_FRACTION + B.ascension_mods(self.ascension)["rest_heal"]
+        p.hp = min(p.max_hp, p.hp + max(1, int(p.max_hp * max(fraction, 0.05))))
         self.to_map()
 
     def _do_smith(self, action):
@@ -538,6 +553,7 @@ class Run:
             # just take the snapshot — the terminal does.
             "fx": list(self.fx),
             "act": self.act,
+            "ascension": self.ascension,
             "floor": self.cur_floor + 1,
             "floors_cleared": self.floors_cleared,
             "elites_killed": self.elites_killed,
@@ -596,7 +612,7 @@ class Run:
             "version": 1,
             "rng": self.rng.to_dict(),
             "player": self.player.to_dict(),
-            "act": self.act, "floors": self.floors,
+            "act": self.act, "ascension": self.ascension, "floors": self.floors,
             "cur_floor": self.cur_floor, "cur_idx": self.cur_idx,
             "visited": self.visited, "floors_cleared": self.floors_cleared,
             "elites_killed": self.elites_killed, "screen": self.screen,
@@ -616,6 +632,8 @@ class Run:
         run.rng = Rng.from_dict(d["rng"])
         run.player = Player.from_dict(d["player"])
         run.act = d["act"]
+        # Saves written before the ladder existed are level 0 runs.
+        run.ascension = d.get("ascension", 0)
         run.floors = d["floors"]
         run.cur_floor = d["cur_floor"]
         run.cur_idx = d["cur_idx"]

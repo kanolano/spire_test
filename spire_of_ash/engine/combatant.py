@@ -75,11 +75,16 @@ def damage_after_modifiers(attacker, base, target, str_mult=1,
 
 
 class Enemy(Combatant):
-    def __init__(self, key, act=1, rng=None, hp=None):
+    def __init__(self, key, act=1, rng=None, hp=None, hp_mult=1.0, strength=0):
         spec = MONSTERS[key]
         if hp is None:
             lo, hi = spec["hp"]
-            hp = int(rng.randint(lo, hi) * (1 + B.ACT_HP_SCALING * (act - 1)))
+            # The roll happens first and is scaled afterwards, so an ascension
+            # level changes how tough this enemy is without changing which
+            # enemies a seed produces. Two runs on the same seed at different
+            # ascensions meet the same monsters.
+            rolled = rng.randint(lo, hi)
+            hp = max(1, int(rolled * (1 + B.ACT_HP_SCALING * (act - 1)) * hp_mult))
         super().__init__(spec["name"], hp)
         self.key = key
         self.rng = rng
@@ -89,6 +94,8 @@ class Enemy(Combatant):
         self.allies = [self]
         if act >= B.FINAL_ACT:
             self.st["strength"] += B.ACT3_ENEMY_STRENGTH
+        if strength:
+            self.st["strength"] += strength
 
     @property
     def spec(self):

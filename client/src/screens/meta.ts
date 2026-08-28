@@ -5,7 +5,9 @@ import { heroSvg } from "../art/heroes";
 import { endingScene } from "../art/scenes";
 import { ctaButton, el, esc, staggerIn } from "../dom";
 import { getRecords } from "../net";
-import { dailyMode, render, S, setDailyMode } from "../store";
+import {
+  ascension, dailyMode, render, S, setAscension, setDailyMode,
+} from "../store";
 
 export function renderSelect(st: HTMLElement) {
   st.appendChild(el("h1", "title big", "Choose your climber"));
@@ -25,7 +27,9 @@ export function renderSelect(st: HTMLElement) {
       + `<div class="cls-blurb">${esc(c.blurb)}</div>`
       + `<div class="cls-line"><b>${esc(c.relic.name)}</b> — ${esc(c.relic.desc)}</div>`
       + `<div class="cls-line">Starting deck: ${esc(c.deck.join(", "))}</div>`;
-    b.onclick = () => void send({ type: "new_run", cls: c.key, daily: dailyMode });
+    b.onclick = () => void send({
+      type: "new_run", cls: c.key, daily: dailyMode, ascension,
+    });
     row.appendChild(b);
   });
   staggerIn(row.children, 0.08, 0.06);
@@ -38,12 +42,56 @@ export function renderSelect(st: HTMLElement) {
     () => { setDailyMode(!dailyMode); render(); });
   toggle.setAttribute("aria-pressed", String(dailyMode));
   st.appendChild(toggle);
+
+  st.appendChild(ascensionPicker());
+}
+
+/**
+ * The difficulty ladder.
+ *
+ * The rungs are described by the server rather than restated here, so the two
+ * cannot disagree about what level 5 does. Each rung keeps everything below it,
+ * which is why the list shows every rung up to the chosen one rather than only
+ * the last.
+ */
+function ascensionPicker(): HTMLElement {
+  const ladder = S().ascension_ladder ?? [];
+  const box = el("div", "ascension");
+  if (!ladder.length) return box;
+  const max = ladder.length;
+
+  const head = el("div", "asc-head");
+  const step = (delta: number, label: string, hint: string) => {
+    const b = el("button", "asc-step", label) as HTMLButtonElement;
+    b.setAttribute("aria-label", hint);
+    b.disabled = delta < 0 ? ascension <= 0 : ascension >= max;
+    b.onclick = () => {
+      setAscension(Math.max(0, Math.min(max, ascension + delta)));
+      render();
+    };
+    return b;
+  };
+  head.appendChild(step(-1, "−", "Lower the ascension"));
+  head.appendChild(el("span", "asc-level",
+    ascension ? `Ascension ${ascension}` : "Ascension 0 — the plain climb"));
+  head.appendChild(step(1, "+", "Raise the ascension"));
+  box.appendChild(head);
+
+  const list = el("div", "asc-list");
+  for (const rung of ladder.slice(0, ascension)) {
+    list.appendChild(el("div", "asc-rung",
+      `<span class="k">${rung.level}</span>${esc(rung.desc)}`));
+  }
+  box.appendChild(list);
+  return box;
 }
 
 export function selectKeys(_k: string, num: number) {
   const cs = S().classes ?? [];
   const cls = cs[num];
-  if (cls) void send({ type: "new_run", cls: cls.key, daily: dailyMode });
+  if (cls) {
+    void send({ type: "new_run", cls: cls.key, daily: dailyMode, ascension });
+  }
 }
 
 export function renderEnd(st: HTMLElement, won: boolean) {

@@ -14,6 +14,46 @@ WEAK_MULT = 0.75
 FRAIL_MULT = 0.75
 COMBAT_LOG_LEN = 40
 
+# ── ascension ──
+# A difficulty ladder. Each rung adds one thing and keeps everything the rungs
+# below it added, so `ascension_mods(n)` is the accumulation of rungs 1..n and
+# level 0 is the game as it plays without any of this.
+#
+# One rung, one idea. A rung that changed three numbers at once would be
+# impossible to attribute when the win rate moved, and `python3 -m
+# spire_of_ash.sim --ascension N` is how each of these was checked.
+MAX_ASCENSION = 8
+
+ASCENSION_RUNGS = [
+    dict(desc="Enemies have more HP.", enemy_hp=0.10),
+    dict(desc="Elites and bosses have more HP.", tough_hp=0.10),
+    dict(desc="You begin the climb wounded.", start_hp=-0.10),
+    dict(desc="Campfires restore less.", rest_heal=-0.05),
+    dict(desc="Enemies have more HP again.", enemy_hp=0.10),
+    dict(desc="Elites lie in wait more often.", elite_chance=0.05),
+    dict(desc="Bosses hit harder.", boss_strength=1),
+    dict(desc="You begin the climb badly wounded.", start_hp=-0.10),
+]
+
+_ASCENSION_KEYS = ("enemy_hp", "tough_hp", "start_hp", "rest_heal",
+                   "elite_chance", "boss_strength")
+
+
+def ascension_mods(level):
+    """Everything rungs 1..level add, summed. Level 0 is all zeroes."""
+    level = max(0, min(int(level or 0), MAX_ASCENSION))
+    out = {k: 0 for k in _ASCENSION_KEYS}
+    for rung in ASCENSION_RUNGS[:level]:
+        for k in _ASCENSION_KEYS:
+            out[k] += rung.get(k, 0)
+    return out
+
+
+def ascension_ladder():
+    """(level, description) for every rung, for a client to show."""
+    return [(i + 1, r["desc"]) for i, r in enumerate(ASCENSION_RUNGS)]
+
+
 # ── enemies ──
 ACT_HP_SCALING = 0.18          # +18% enemy HP per act beyond the first
 ACT3_ENEMY_STRENGTH = 1

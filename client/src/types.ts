@@ -218,6 +218,10 @@ export interface State {
   deck: CardView[];
   map: MapView;
   classes?: ClassView[];
+  /** Which rung the run is being played on; 0 is the game with none of it. */
+  ascension: number;
+  /** Only sent with the select screen, since that is where it can be chosen. */
+  ascension_ladder?: { level: number; desc: string }[];
   combat?: CombatView;
   reward?: RewardView;
   choose?: ChooseView;
@@ -240,7 +244,8 @@ export interface RecordView {
 /* ── actions the client can send ───────────────────────────── */
 
 export type Action =
-  | { type: "new_run"; cls?: string; daily?: boolean; seed?: number }
+  | { type: "new_run"; cls?: string; daily?: boolean; seed?: number;
+      ascension?: number }
   | { type: "map"; idx: number }
   | { type: "play"; idx: number; target: number | null; exhaust: number | null }
   | { type: "potion"; idx: number; target: number | null }

@@ -25,6 +25,11 @@ let selection: Selection | null = null;
 export let dailyMode = false;
 export const setDailyMode = (on: boolean) => { dailyMode = on; };
 
+/** The difficulty rung the next run will start on. Client-side until a run
+ *  begins; after that the server's `state.ascension` is the truth. */
+export let ascension = 0;
+export const setAscension = (n: number) => { ascension = n; };
+
 /** So the director only runs on a real server response, not on a re-render
  *  caused by selecting or cancelling a card. */
 export let lastScreen: string | null = null;

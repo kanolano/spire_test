@@ -9,6 +9,7 @@ the old `Game` and `Session` did.
 import argparse
 import sys
 
+from .. import balance as B
 from ..engine.errors import InvalidAction
 from ..engine.records import load_records, save_record
 from ..engine.run import Run
@@ -427,9 +428,9 @@ SCREENS = {
 }
 
 
-def play(seed=None):
+def play(seed=None, ascension=0):
     """One climb. Returns True if the player wants another."""
-    run = Run(seed=seed)
+    run = Run(seed=seed, ascension=ascension)
     while True:
         st = view(run)
         if run.finished:
@@ -451,12 +452,22 @@ def main(argv=None):
                         help="play a reproducible run")
     parser.add_argument("--daily", action="store_true",
                         help="play today's shared seed")
+    parser.add_argument("--ascension", type=int, default=0, metavar="N",
+                        help=f"difficulty rung 0-{B.MAX_ASCENSION}; "
+                             f"each rung adds one thing and keeps the rest")
     args = parser.parse_args(argv)
     seed = daily_seed() if args.daily else args.seed
     if args.daily:
         print(c(f"\n  Daily climb — {daily_label()}\n", YEL))
+    asc = max(0, min(args.ascension, B.MAX_ASCENSION))
+    if asc:
+        print(c(f"\n  Ascension {asc}", YEL))
+        for level, desc in B.ascension_ladder()[:asc]:
+            print(c(f"    {level}. {desc}", GRY))
+        print()
+        pause()
     try:
-        while play(seed):
+        while play(seed, asc):
             seed = None           # only the first run honours an explicit seed
     except SystemExit:
         pass

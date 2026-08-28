@@ -6,6 +6,7 @@ whether a card needed an extra choice; cards now declare that themselves via
 `Card.requires`.
 """
 
+from .. import balance as B
 from ..content.cards import CARDS
 from ..content.classes import CLASSES
 from ..content.potions import POTIONS
@@ -127,9 +128,12 @@ def view(run):
     st["player"]["potions"] = [potion_dto(k) for k in p.potions]
     st["deck"] = sorted_cards(p.deck)
 
-    # The roster is only read by the character-select screen.
+    # The roster and the difficulty ladder are only read by the
+    # character-select screen, which is the one place either can be chosen.
     if run.screen == "select":
         st["classes"] = CLASS_ROSTER
+        st["ascension_ladder"] = [{"level": lvl, "desc": desc}
+                                  for lvl, desc in B.ascension_ladder()]
 
     if cb:
         c = st["combat"]

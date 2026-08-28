@@ -13,6 +13,7 @@ import urllib.request
 
 import helpers  # noqa: F401  (puts the package on sys.path)
 
+from spire_of_ash import balance as B
 from spire_of_ash.engine.run import Run
 from spire_of_ash.web import app as web_app
 from spire_of_ash.web.dto import view
@@ -108,6 +109,46 @@ class TestRouting(WebTestCase):
         _, first, _ = c.request("/state")
         _, second, _ = c.request("/state")
         self.assertEqual(first, second)
+
+
+class TestAscensionOverTheWire(WebTestCase):
+    """The ladder is only a feature if a client can actually choose a rung."""
+
+    def test_the_select_screen_is_told_what_each_rung_does(self):
+        c = self.client()
+        _, body, _ = c.request("/state")
+        self.assertEqual(body["screen"], "select")
+        ladder = body["ascension_ladder"]
+        self.assertEqual([r["level"] for r in ladder],
+                         list(range(1, B.MAX_ASCENSION + 1)))
+        self.assertTrue(all(r["desc"] for r in ladder))
+
+    def test_a_run_starts_at_the_rung_it_was_asked_for(self):
+        c = self.client()
+        _, body, _ = c.request("/action",
+                               {"type": "new_run", "cls": "sentinel", "ascension": 5})
+        self.assertEqual(body["ascension"], 5)
+        # Rung 3 takes health off the top, so the climb starts hurt.
+        self.assertLess(body["player"]["hp"], body["player"]["max_hp"])
+
+    def test_omitting_it_is_the_plain_climb(self):
+        c = self.client()
+        _, body, _ = c.request("/action", {"type": "new_run", "cls": "sentinel"})
+        self.assertEqual(body["ascension"], 0)
+        self.assertEqual(body["player"]["hp"], body["player"]["max_hp"])
+
+    def test_a_nonsense_rung_is_400_not_500(self):
+        c = self.client()
+        status, body, _ = c.request(
+            "/action", {"type": "new_run", "cls": "sentinel", "ascension": "high"})
+        self.assertEqual(status, 400)
+        self.assertIn("error", body)
+
+    def test_the_rung_survives_a_reload(self):
+        c = self.client()
+        c.request("/action", {"type": "new_run", "cls": "sentinel", "ascension": 4})
+        _, body, _ = c.request("/state")
+        self.assertEqual(body["ascension"], 4)
 
 
 class TestValidation(WebTestCase):

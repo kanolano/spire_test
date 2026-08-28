@@ -19,6 +19,7 @@ Terminal:
 python3 -m spire_of_ash.term
 python3 -m spire_of_ash.term --seed 42  # replay a reproducible run
 python3 -m spire_of_ash.term --daily    # today's shared seed
+python3 -m spire_of_ash.term --ascension 5   # climb it the hard way
 ```
 
 Runs are seeded, so a seed is a shareable challenge. The browser client has a
@@ -87,6 +88,36 @@ timestamp rather than a fact. What the first 2,100-run report found:
   advice. Capping the deck at 22 cards cost the Emberbrewer two thirds of its
   win rate, so card rewards are not the trap they are in the games this one is
   in the spirit of.
+
+## Ascension
+
+A difficulty ladder, eight rungs. Each rung adds exactly one thing and keeps
+everything the rungs below it added, so level 5 is levels 1–5 together:
+
+| | |
+|---|---|
+| 1 | Enemies have more HP |
+| 2 | Elites and bosses have more HP |
+| 3 | You begin the climb wounded |
+| 4 | Campfires restore less |
+| 5 | Enemies have more HP again |
+| 6 | Elites lie in wait more often |
+| 7 | Bosses hit harder |
+| 8 | You begin the climb badly wounded |
+
+The browser client has a picker on the character-select screen; the terminal
+takes `--ascension N`. A seed meets the **same monsters at every level** — only
+their size changes — so the same run is comparable rung to rung, and the level
+travels with a save and onto the leaderboard.
+
+One rung, one idea, because a rung that moved three numbers at once could not be
+attributed when the win rate shifted. The ladder is monotonic by measurement,
+not by assertion — mean floors reached falls at every rung, 9.9 at level 0 down
+to 5.7 at level 8 over 120 runs a class:
+
+```sh
+python3 -m spire_of_ash.sim --ascension 5    # check a rung yourself
+```
 
 ## How it plays
 
